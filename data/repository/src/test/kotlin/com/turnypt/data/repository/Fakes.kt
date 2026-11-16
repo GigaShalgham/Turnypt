@@ -175,13 +175,20 @@ class TestDevice(
         deriveContext = Dispatchers.Unconfined,
     )
 
+    /**
+     * v1.3.1: settable like the real DataStore-backed source — tests can
+     * change the setting mid-flight and assert the change reaches LIVE
+     * sessions (the lock-time fix).
+     */
+    var sessionTimeoutMillis: Long = 300_000L
+
     val cipher = MessageCipher(
         contacts = contacts,
         sessionKeys = sessionKeys,
         sessions = sessions,
         protector = protector,
         provider = PassphraseCryptoProvider(),
-        sessionTimeout = { 300_000L },
+        sessionTimeout = { sessionTimeoutMillis },
         dispatchers = dispatchers,
     )
 

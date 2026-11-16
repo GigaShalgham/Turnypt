@@ -355,6 +355,85 @@ class MessageCipherTest {
         assertTrue(outcome is EncryptOutcome.NeedsUnlock)
     }
 
+    // ------------------------------------------------ v1.3.1 lock-time fix
+
+    /**
+     * The user-visible bug: "changing lock time didn't work". Before the
+     * fix the timeout was read exactly once (at unlock) and frozen into an
+     * absolute deadline — changing it in Settings did NOTHING to an
+     * already-unlocked session. The facade must push the change into LIVE
+     * sessions: here a session 4 minutes into its 5-minute budget dies the
+     * moment the setting tightens to 1 minute.
+     */
+    @Test
+    fun `tightening the lock time locks an over-lived live session immediately`() = runTest {
+        val device = TestDevice()
+        val (contact, _) = device.newContact("Bob")
+        device.cipher.unlockContact(contact.id, passphrase.toCharArray())
+        assertTrue(device.cipher.isUnlocked(contact.id))
+
+        // 4 minutes: still alive under the OLD 5-minute deadline...
+        device.time.now += 240_000
+        assertTrue(device.cipher.isUnlocked(contact.id))
+
+        // ...but dead the moment the setting tightens to 1 minute.
+        device.cipher.rearmSessionTimeout(60_000L)
+        assertTrue(!device.cipher.isUnlocked(contact.id))
+        val outcome = device.cipher.encryptDraft(contact.id, "hello")
+        assertTrue(outcome is EncryptOutcome.NeedsUnlock)
+    }
+
+    /**
+     * The other half of the fix: a change while nothing is live must simply
+     * apply to the NEXT unlock (the setting travels with the unlock, not
+     * by resurrecting anything).
+     */
+    @Test
+    fun `the setting change travels to the next unlock`() = runTest {
+        val device = TestDevice()
+        val (contact, _) = device.newContact("Bob")
+        device.sessionTimeoutMillis = 60_000L // the "DataStore" changed
+
+        device.cipher.unlockContact(contact.id, passphrase.toCharArray())
+        device.time.now += 300_001 // past the OLD 5-minute timeout
+        assertTrue(!device.cipher.isUnlocked(contact.id))
+    }
+
+    /** A loosening never brings a dead session back. */
+    @Test
+    fun `loosening the lock time never resurrects a dead session`() = runTest {
+        val device = TestDevice()
+        val (contact, _) = device.newContact("Bob")
+        device.cipher.unlockContact(contact.id, passphrase.toCharArray())
+        device.time.now += 300_001 // expired
+        assertTrue(!device.cipher.isUnlocked(contact.id))
+
+        device.cipher.rearmSessionTimeout(24 * 60 * 60_000L)
+        assertTrue(!device.cipher.isUnlocked(contact.id))
+    }
+
+    /**
+     * Re-unlocking under the CURRENT setting must re-arm the countdown —
+     * the pre-fix behaviour returned AlreadyUnlocked forever under the
+     * frozen deadline, so a user whose timeout "didn't work" could never
+     * even refresh it by re-entering the passphrase. (Once the session
+     * expires, a fresh unlock derives and re-arms it.)
+     */
+    @Test
+    fun `re-unlocking after expiry re-arms the countdown under the live setting`() = runTest {
+        val device = TestDevice()
+        val (contact, _) = device.newContact("Bob")
+        device.cipher.unlockContact(contact.id, passphrase.toCharArray())
+        device.time.now += 300_001
+        assertTrue(!device.cipher.isUnlocked(contact.id))
+
+        device.sessionTimeoutMillis = 60_000L
+        device.cipher.unlockContact(contact.id, passphrase.toCharArray())
+        assertTrue(device.cipher.isUnlocked(contact.id))
+        device.time.now += 60_001
+        assertTrue(!device.cipher.isUnlocked(contact.id))
+    }
+
     @Test
     fun `contacts are cryptographically isolated`() = runTest {
         val device = TestDevice()

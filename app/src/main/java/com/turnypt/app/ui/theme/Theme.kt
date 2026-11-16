@@ -11,9 +11,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.turnypt.app.R
+
+/**
+ * v1.3.1: Vazirmatn (SIL OFL 1.1) — the bundled type family for every
+ * locale. Persian words render in proper Naskh instead of the system's
+ * fallback stitching (the v0.5.1 translation was readable but visually
+ * second-class), while Latin text keeps a matching humanist tone — one
+ * family, no per-locale branching. Loaded from res/font per weight, so it
+ * works fully offline (local-first).
+ */
+private val Vazirmatn = FontFamily(
+    Font(R.font.vazirmatn_regular, FontWeight.Normal),
+    Font(R.font.vazirmatn_medium, FontWeight.Medium),
+    Font(R.font.vazirmatn_semibold, FontWeight.SemiBold),
+    Font(R.font.vazirmatn_bold, FontWeight.Bold),
+)
 
 /**
  * v0.5.0 theme ("Calm Vault", docs/DESIGN.md): the v0.4 color schemes
@@ -121,52 +139,65 @@ private val AppShapes = Shapes(
  * no longer drive emphasis with ad-hoc fontSize values. labelLarge is the
  * button/CTA style; titleMedium (with an optional leading icon) titles
  * every section card.
+ *
+ * v1.3.1: every style now sets fontFamily = [Vazirmatn] — the Persian/
+ * Latin family introduced for the Persian translation. Persian numerals
+ * in localized strings render correctly through the family's own glyphs.
  */
 private val AppTypography = Typography(
     headlineMedium = TextStyle(
+        fontFamily = Vazirmatn,
         fontWeight = FontWeight.Bold,
         fontSize = 28.sp,
         lineHeight = 36.sp,
     ),
     headlineSmall = TextStyle(
+        fontFamily = Vazirmatn,
         fontWeight = FontWeight.Bold,
         fontSize = 24.sp,
         lineHeight = 32.sp,
     ),
     titleMedium = TextStyle(
+        fontFamily = Vazirmatn,
         fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.15.sp,
     ),
     titleSmall = TextStyle(
+        fontFamily = Vazirmatn,
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp,
     ),
     bodyLarge = TextStyle(
+        fontFamily = Vazirmatn,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.5.sp,
     ),
     bodyMedium = TextStyle(
+        fontFamily = Vazirmatn,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.25.sp,
     ),
     bodySmall = TextStyle(
+        fontFamily = Vazirmatn,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.4.sp,
     ),
     labelLarge = TextStyle(
+        fontFamily = Vazirmatn,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp,
     ),
     labelMedium = TextStyle(
+        fontFamily = Vazirmatn,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,

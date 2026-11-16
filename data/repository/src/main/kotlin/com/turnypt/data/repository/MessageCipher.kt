@@ -394,6 +394,18 @@ class MessageCipher(
 
     suspend fun lockAll(): Int = sessions.lockAll()
 
+    /**
+     * v1.3.1 (lock-time fix): applies a timeout CHANGE to every live
+     * session (active + historical) — the countdown restarts from now, and
+     * sessions already past the new deadline are wiped immediately. Called
+     * by Settings whenever the user changes the value, so the change is
+     * enforced on what is unlocked RIGHT NOW, not just the next unlock.
+     *
+     * Returns the number of live sessions re-armed.
+     */
+    suspend fun rearmSessionTimeout(newTimeoutMillis: Long): Int =
+        sessions.rearmTimeout(newTimeoutMillis)
+
     suspend fun isUnlocked(contactId: ContactId): Boolean = sessions.activeSession(contactId) != null
 
     suspend fun activeSessionFingerprint(contactId: ContactId): String? =

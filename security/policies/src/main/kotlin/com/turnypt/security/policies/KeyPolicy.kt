@@ -35,13 +35,22 @@ object KeyPolicy {
      */
     val TIMEOUT_CHOICES_MILLIS: List<Long> = listOf(
         60_000L,          // 1 min
-        300_000L,         // 5 min
-        900_000L,         // 15 min (default)
-        3_600_000L,       // 1 h
-        14_400_000L,      // 4 h
-        43_200_000L,      // 12 h
-        86_400_000L,      // 24 h
+        300_000L,        // 5 min (the default — see DEFAULT_SESSION_TIMEOUT_MILLIS)
+        900_000L,        // 15 min
+        3_600_000L,      // 1 h
+        14_400_000L,     // 4 h
+        43_200_000L,     // 12 h
+        86_400_000L,     // 24 h
     )
+
+    /**
+     * v1.3.1 (lock-time fix): the deadline of a session whose countdown
+     * started at [unlockedAtMillis] under [timeoutMillis] — the arithmetic
+     * the session manager evaluates against the live fields, kept here so
+     * policy arithmetic lives in exactly one place.
+     */
+    fun sessionDeadline(unlockedAtMillis: Long, timeoutMillis: Long): Long =
+        unlockedAtMillis + clampSessionTimeout(timeoutMillis)
 
     /** Clamps a requested timeout into the accepted range. */
     fun clampSessionTimeout(requestedMillis: Long): Long =

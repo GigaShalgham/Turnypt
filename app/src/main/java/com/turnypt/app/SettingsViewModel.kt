@@ -128,9 +128,21 @@ class SettingsViewModel @Inject constructor(
         setSessionTimeoutMillis(minutes * 60_000L)
     }
 
+    /**
+     * v1.3.1 (lock-time fix): the change must reach LIVE sessions too, not
+     * just the next unlock. Before this, the timeout was read exactly once
+     * (at unlock) and frozen into an absolute deadline — tightening from
+     * 24 h to 1 min left already-unlocked sessions live for hours.
+     *
+     * Persist first, then re-arm: every live session's countdown restarts
+     * from NOW under the new value; sessions already past the new (tighter)
+     * deadline are wiped immediately. The sessionChanges counter bumps, so
+     * every open screen re-reads who is unlocked.
+     */
     fun setSessionTimeoutMillis(millis: Long) {
         viewModelScope.launch {
             settingsRepository.setSessionTimeoutMillis(millis)
+            messageCipher.rearmSessionTimeout(millis)
         }
     }
 

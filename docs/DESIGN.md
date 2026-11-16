@@ -233,8 +233,13 @@ The compatibility matrix and recommended flow per app are documented in
 
 - **No tutorial/onboarding walls** — explicit earlier user feedback.
 - **No dynamic color** — §3.1.
-- **No custom fonts, illustrations or animations** — dependency-free calm;
-  the icon table stays hand-built vectors.
+- **No decorative fonts, illustrations or animations** — the calm stands.
+  The v1.3.1 exception is a typographic necessity, not decoration:
+  **Vazirmatn** (SIL OFL 1.1) is bundled as the type family because the
+  Persian translation (v0.5.1) rendered through the system's fallback
+  stitching — a Persian-first family that also covers Latin serves every
+  locale through one family, still offline (local-first), with no
+  per-locale branching. The icon table stays hand-built vectors.
 - **No new permissions** — the shortcuts path needs none.
 
 ## References

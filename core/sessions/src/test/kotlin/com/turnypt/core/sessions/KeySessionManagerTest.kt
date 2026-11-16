@@ -31,7 +31,13 @@ class KeySessionManagerTest {
         timeSource = time,
     )
 
-    private suspend fun unlock(manager: KeySessionManager, contactId: ContactId, passphrase: String, saltSeed: Int): SessionKey {
+    private suspend fun unlock(
+        manager: KeySessionManager,
+        contactId: ContactId,
+        passphrase: String,
+        saltSeed: Int,
+        timeoutMillis: Long = 60_000,
+    ): SessionKey {
         val derived = manager.deriveKey(passphrase.toCharArray(), salt(saltSeed), fastParams)
         return manager.activate(
             contactId = contactId,
@@ -40,7 +46,7 @@ class KeySessionManagerTest {
             salt = salt(saltSeed),
             params = fastParams,
             keyBytes = derived,
-            timeoutMillis = 60_000,
+            timeoutMillis = timeoutMillis,
         )
     }
 
@@ -188,6 +194,7 @@ class KeySessionManagerTest {
         contactId: ContactId,
         sessionId: SessionId,
         saltSeed: Int,
+        timeoutMillis: Long = 60_000,
     ): SessionKey {
         val derived = manager.deriveKey("old-pass".toCharArray(), salt(saltSeed), fastParams)
         return manager.activateHistorical(
@@ -197,7 +204,7 @@ class KeySessionManagerTest {
             salt = salt(saltSeed),
             params = fastParams,
             keyBytes = derived,
-            timeoutMillis = 60_000,
+            timeoutMillis = timeoutMillis,
         )
     }
 
@@ -344,6 +351,118 @@ class KeySessionManagerTest {
 
         time.now += 60_001
         assertEquals(1, manager.sweepExpired())
+        assertTrue(manager.sessionChanges.value > before)
+    }
+
+    // --------------------------------------------- v1.3.1 rearmTimeout
+
+    /**
+     * The lock-time fix itself: before v1.3.1 the timeout was frozen into an
+     * absolute deadline at unlock, so changing it in Settings did nothing to
+     * already-unlocked sessions — tightening 24 h → 1 min left them live for
+     * hours. The countdown must now follow the LIVE timeout value.
+     */
+    @Test
+    fun `tightening the timeout wipes sessions that already outlived it`() = runTest {
+        val manager = manager()
+        // Unlocked under 4 h; 90 s later the user tightens to 1 minute: the
+        // session has already outlived the new budget (90 s > 60 s) — it must
+        // lock RIGHT NOW, not 4 h from now.
+        val sessionKey = unlock(manager, contactA, "passphrase", 1, timeoutMillis = 4 * 60 * 60_000L)
+        time.now += 90_000
+        assertEquals(1, manager.rearmTimeout(60_000L))
+        assertNull(manager.activeSession(contactA))
+        assertTrue(sessionKey.keyBytes.all { it == 0.toByte() })
+    }
+
+    /** A tightening that does not condemn the session keeps it, under the new budget. */
+    @Test
+    fun `tightening keeps younger sessions under the new budget`() = runTest {
+        val manager = manager()
+        unlock(manager, contactA, "passphrase", 1, timeoutMillis = 4 * 60 * 60_000L)
+
+        // 90 s elapsed, tightened 4 h -> 1 h: alive now, dies exactly at the
+        // anchor + 1 h — NOT 1 h from the change (no sliding renewal).
+        time.now += 90_000
+        assertEquals(1, manager.rearmTimeout(60 * 60_000L))
+        assertEquals(SessionId("session-contact-a-1"), manager.activeSession(contactA)?.sessionId)
+        time.now = 1_000_000 + 60 * 60_000L + 1
+        assertNull(manager.activeSession(contactA))
+    }
+
+    /**
+     * The doctrine survives the change: the countdown still starts at UNLOCK
+     * (the anchor is kept), so re-arming can never grant a session more
+     * lifetime than the new setting allows from its original anchor.
+     */
+    @Test
+    fun `rearming does not slide the anchor`() = runTest {
+        val manager = manager()
+        unlock(manager, contactA, "passphrase", 1) // 60 s budget from t=1_000_000
+
+        time.now += 30_000
+        assertEquals(1, manager.rearmTimeout(60_000L))
+        // Still exactly the ORIGINAL deadline: 1_060_000, not 1_090_000.
+        assertEquals(1_060_000L, manager.expiryOf(contactA))
+        time.now += 30_001
+        assertNull(manager.activeSession(contactA))
+    }
+
+    /** An extension never reaches back and revives an expired session. */
+    @Test
+    fun `extension never resurrects an expired session`() = runTest {
+        val manager = manager()
+        val sessionKey = unlock(manager, contactA, "passphrase", 1)
+
+        time.now += 60_001 // expired under the old deadline
+        assertEquals(0, manager.rearmTimeout(24 * 60 * 60_000L))
+        assertNull(manager.activeSession(contactA))
+        assertTrue(sessionKey.keyBytes.all { it == 0.toByte() })
+    }
+
+    /** Historical (old-era) sessions follow the live timeout too. */
+    @Test
+    fun `rearmTimeout applies to historical sessions`() = runTest {
+        val manager = manager()
+        // Unlocked under 4 h; tightened to 1 minute after 90 s — outlived.
+        val historical = unlockHistorical(manager, contactA, SessionId("old-era-1"), 1, timeoutMillis = 4 * 60 * 60_000L)
+        time.now += 90_000
+        // Applied (lethally): the count reflects the application, the sweep
+        // below reflects the wipe.
+        assertEquals(1, manager.rearmTimeout(60_000L))
+        assertNull(manager.historicalSession(SessionId("old-era-1")))
+        assertTrue(historical.keyBytes.all { it == 0.toByte() })
+    }
+
+    /** No live sessions: the change applies to the next unlock only — a no-op here. */
+    @Test
+    fun `rearmTimeout with nothing live is a no-op`() = runTest {
+        val manager = manager()
+        val before = manager.sessionChanges.value
+        assertEquals(0, manager.rearmTimeout(3_600_000L))
+        assertEquals(before, manager.sessionChanges.value)
+    }
+
+    /** Out-of-range values are clamped against KeyPolicy, never trusted. */
+    @Test
+    fun `rearmTimeout clamps the requested value`() = runTest {
+        val manager = manager()
+        unlock(manager, contactA, "passphrase", 1)
+
+        // 1 ms would kill everything instantly; the policy floor is 1 minute.
+        assertEquals(1, manager.rearmTimeout(1L))
+        assertEquals(1_000_000L + 60_000L, manager.expiryOf(contactA))
+    }
+
+    /** A tightening that locks must bump the counter the UIs collect. */
+    @Test
+    fun `rearmTimeout bumps sessionChanges when it wipes`() = runTest {
+        val manager = manager()
+        unlock(manager, contactA, "passphrase", 1, timeoutMillis = 4 * 60 * 60_000L)
+        val before = manager.sessionChanges.value
+
+        time.now += 90_000
+        manager.rearmTimeout(60_000L) // wipes the over-lived session
         assertTrue(manager.sessionChanges.value > before)
     }
 

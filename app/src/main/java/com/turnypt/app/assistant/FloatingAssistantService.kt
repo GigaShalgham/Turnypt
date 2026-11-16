@@ -90,6 +90,26 @@ class FloatingAssistantService : Service() {
     private var panel: LinearLayout? = null
     private var expanded = false
 
+    /**
+     * v1.3.1: the panel's label typeface — Vazirmatn Medium from res/font,
+     * cached once (resolving a font resource per row is waste). Persian
+     * panel labels render in proper Naskh like the rest of the UI; Latin
+     * keeps the family's matching humanist tone. Falls back to the platform
+     * medium face if the resource cannot load (never crash an overlay).
+     */
+    private val mediumTypeface: Typeface by lazy {
+        runCatching {
+            resources.getFont(R.font.vazirmatn_medium)
+        }.getOrElse { Typeface.create("sans-serif-medium", Typeface.NORMAL) }
+    }
+
+    /** v1.3.1: the panel's hint typeface — Vazirmatn Regular (see [mediumTypeface]). */
+    private val regularTypeface: Typeface by lazy {
+        runCatching {
+            resources.getFont(R.font.vazirmatn_regular)
+        }.getOrElse { Typeface.DEFAULT }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -241,6 +261,7 @@ class FloatingAssistantService : Service() {
                     text = getString(R.string.assistant_hint)
                     textSize = 11f
                     setTextColor(Color.argb(200, 168, 176, 200))
+                    typeface = regularTypeface
                     setPadding(
                         (12 * density).toInt(),
                         (8 * density).toInt(),
@@ -275,7 +296,7 @@ class FloatingAssistantService : Service() {
                     text = getString(R.string.assistant_panel_title)
                     textSize = 12f
                     setTextColor(Color.argb(190, 168, 176, 200))
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                    typeface = mediumTypeface
                     layoutParams = LinearLayout.LayoutParams(
                         0,
                         LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -362,7 +383,7 @@ class FloatingAssistantService : Service() {
                     text = getString(labelRes)
                     textSize = 15f
                     setTextColor(Color.argb(245, 233, 236, 248))
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                    typeface = mediumTypeface
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT,

@@ -189,7 +189,7 @@
     <string name="settings_title">Settings</string>
     <string name="settings_unlock_section">Unlock &amp; security</string>
     <string name="settings_timeout_title">Stay unlocked for</string>
-    <string name="settings_timeout_summary">Unlocked keys are held in memory for this long and then wiped. You can always lock immediately.</string>
+    <string name="settings_timeout_summary">Unlocked keys are held in memory for this long and then wiped. Changing the value applies to what is unlocked right now; you can always lock immediately.</string>
     <string name="option_minutes">%1$d min</string>
     <string name="option_hours">%1$d h</string>
     <!-- v0.5.1: compact timeout chips (Settings shrank, user feedback). -->

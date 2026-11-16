@@ -2,10 +2,17 @@ package com.turnypt.keyboard.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.turnypt.keyboard.R
 
 // Compact Material palette local to the IME (the keyboard module keeps its
 // own theme so it never depends on the app module).
@@ -35,10 +42,53 @@ private val ImeLight = lightColorScheme(
     error = Color(0xFFB23B3B),
 )
 
+/**
+ * v1.3.1: Vazirmatn (SIL OFL 1.1) for the IME's own UI strings — the
+ * module's own res/font copy (Regular/Medium), so the keyboard surfaces
+ * render Persian labels in proper Naskh exactly like the app does. The
+ * module never depends on the app module; the faces it needs travel here.
+ */
+private val Vazirmatn = FontFamily(
+    Font(R.font.vazirmatn_regular, FontWeight.Normal),
+    Font(R.font.vazirmatn_medium, FontWeight.Medium),
+)
+
+/**
+ * The compact IME type scale: the IME shows few words (row labels, dialog
+ * titles and body text, notices), so only the styles it actually uses get
+ * the family — the rest inherit the M3 defaults composed with the family
+ * below.
+ */
+private val ImeTypography = Typography(
+    titleSmall = TextStyle(
+        fontFamily = Vazirmatn,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = Vazirmatn,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+    ),
+    bodySmall = TextStyle(
+        fontFamily = Vazirmatn,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+    ),
+    labelLarge = TextStyle(
+        fontFamily = Vazirmatn,
+        fontWeight = FontWeight.Medium,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+    ),
+)
+
 @Composable
 fun KeyboardTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (isSystemInDarkTheme()) ImeDark else ImeLight,
+        typography = ImeTypography,
         content = content,
     )
 }

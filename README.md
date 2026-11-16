@@ -98,10 +98,12 @@ sha256sum Turnypt-v1.0.0-debug.apk
 2. **Unlock per session.** The passphrase is never stored. Deriving the
    AES-256 key takes ~hundreds of milliseconds (Argon2id, 64 MiB / 3 passes
    by default). Keys live in memory only and are wiped on lock, timeout or
-   replacement, plus a periodic sweep of expired sessions. After the first
-   successful unlock on a device, a Keystore-wrapped digest verifier lets
-   wrong passphrases be rejected at unlock time — the raw key is never
-   persisted, even wrapped.
+   replacement, plus a periodic sweep of expired sessions; changing the
+   lock time in Settings applies to what is unlocked right now (v1.3.1 —
+   the countdown follows the live setting, never a frozen deadline). After
+   the first successful unlock on a device, a Keystore-wrapped digest
+   verifier lets wrong passphrases be rejected at unlock time — the raw key
+   is never persisted, even wrapped.
 3. **Encrypt/decrypt in any app.** The selection toolbar and the sharesheet
    carry text in and out; the clipboard fallback covers the rest.
 

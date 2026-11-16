@@ -179,7 +179,7 @@
     <string name="settings_title">تنظیمات</string>
     <string name="settings_unlock_section">قفل و امنیت</string>
     <string name="settings_timeout_title">مدت باز ماندن قفل</string>
-    <string name="settings_timeout_summary">کلیدهای باز تا این مدت در حافظه نگه‌داری و سپس پاک می‌شوند. همیشه می‌توانید فوراً قفل کنید.</string>
+    <string name="settings_timeout_summary">کلیدهای باز تا این مدت در حافظه نگه‌داری و سپس پاک می‌شوند. تغییر این مقدار همان لحظه روی نشست‌های بازِ همین حالا اعمال می‌شود؛ همیشه می‌توانید فوراً قفل کنید.</string>
     <string name="option_minutes">%1$d دقیقه</string>
     <string name="option_hours">%1$d ساعت</string>
     <string name="option_minutes_short">%1$d د</string>

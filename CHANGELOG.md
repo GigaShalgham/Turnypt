@@ -9,6 +9,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-16 — lock-time fix + Vazirmatn
+
+Two user reports in one: "changing lock time had some bugs and didn't
+work", and "add font for Persian words".
+
+### Fixed
+
+- **Changing the lock time now actually works** (user report: "changing
+  lock time had some bugs and didn't work"). Before, the timeout was
+  read exactly ONCE — at the moment of unlock — and frozen into an
+  absolute deadline inside the session manager. Every consequence of
+  that single decision was wrong:
+  - tightening (24 h → 1 min) did nothing to already-unlocked sessions:
+    they stayed live until the stale 24 h deadline, and even the 60 s
+    background sweeper kept honouring the frozen deadline;
+  - re-entering the passphrase could not fix it either — the contact was
+    "already unlocked", so the answer was AlreadyUnlocked and the frozen
+    deadline stayed;
+  - the Settings chip row therefore looked completely dead whenever a
+    session was live.
+  The deadline is now derived from live fields (`unlockedAt` + the
+  CURRENT timeout) and evaluated at every query/sweep, and a settings
+  change calls `rearmTimeout`, which applies the new value to every live
+  session as if it had been the setting AT UNLOCK: tightening wipes a
+  session that already outlived the new budget immediately (a tightening
+  can LOCK, not merely shorten future lifetimes), while an extension
+  grants the fuller budget from the session's original anchor — but
+  never resurrects an already-expired session. The "no sliding renewal,
+  countdown starts at unlock" doctrine is preserved: a change can never
+  grant more lifetime than the new setting allows from the original
+  anchor. Wipes bump the sessionChanges counter, so every open screen
+  re-reads who is unlocked. The timeout summary string (en + fa) now says
+  the change applies to what is unlocked right now.
+  - `KeySessionManager.rearmTimeout` (+ clamping against `KeyPolicy`, so
+    a forged/out-of-range value can never reach the session policy), the
+    `MessageCipher.rearmSessionTimeout` facade pass-through, and the
+    `SettingsViewModel` wiring (persist, then re-arm).
+  - Tests: 9 manager-level cases (tightening wipes over-lived sessions,
+    younger sessions keep the new budget, the anchor never slides,
+    extension never resurrects, historical sessions follow, no-op,
+    clamping, counter bumps) and 4 facade-level cases through
+    `MessageCipher` (tightening locks an over-lived live session, the
+    setting travels to the next unlock, loosening never resurrects,
+    re-unlocking after expiry re-arms under the live setting).
+
+### Added
+
+- **Vazirmatn, a bundled Persian font** (user request: "add font for
+  Persian words") — the Persian translation (v0.5.1) rendered through the
+  system's fallback stitching, readable but visually second-class.
+  Vazirmatn (https://github.com/rastikerdar/vazirmatn, SIL OFL 1.1, kept
+  at `res/raw/vazirmatn_ofl.txt`) covers Persian in proper Naskh AND
+  Latin, so one family serves every locale with no per-locale branching:
+  - app Compose theme: all type-scale styles (headline/title/body/label)
+    set the family — Regular/Medium/SemiBold/Bold, bundled per weight
+    (no downloadable-fonts provider: Turnypt is local-first and renders
+    offline);
+  - keyboard module: its own res/font copy (Regular/Medium) wired into
+    the IME typography (the module keeps its own theme and never depends
+    on the app module);
+  - floating-assistant panel (plain Views, not Compose): the row labels
+    and header use Vazirmatn Medium, the hint line Vazirmatn Regular,
+    each cached once with a platform fallback.
+
 ## [1.3.0] - 2026-11-13 — Turnypt-ecosystem image extension (.tnpi)
 
 The user's ruling on the 1.2.0 image-extension approach, applied at the

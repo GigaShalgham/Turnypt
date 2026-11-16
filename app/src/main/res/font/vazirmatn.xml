@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v1.3.1: Vazirmatn (https://github.com/rastikerdar/vazirmatn, SIL OFL 1.1 —
+  license kept at res/raw/vazirmatn_ofl.txt). A Persian-first family that
+  ALSO covers Latin, so it serves every locale: Persian words render in
+  proper Naskh instead of the system's fallback stitching, and Latin text
+  keeps a matching humanist tone. Bundled per-weight (no downloadable-fonts
+  provider: Turnypt is local-first and must render offline).
+-->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font android:fontStyle="normal" android:fontWeight="400" android:font="@font/vazirmatn_regular" />
+    <font android:fontStyle="normal" android:fontWeight="500" android:font="@font/vazirmatn_medium" />
+    <font android:fontStyle="normal" android:fontWeight="600" android:font="@font/vazirmatn_semibold" />
+    <font android:fontStyle="normal" android:fontWeight="700" android:font="@font/vazirmatn_bold" />
+</font-family>

@@ -11,6 +11,7 @@ import com.turnypt.core.common.ContactId
 import com.turnypt.core.common.SessionId
 import com.turnypt.core.crypto.Argon2KeyDerivator
 import com.turnypt.core.crypto.Argon2Params
+import com.turnypt.security.policies.KeyPolicy
 import java.util.Arrays
 import kotlin.coroutines.CoroutineContext
 
@@ -25,7 +26,8 @@ import kotlin.coroutines.CoroutineContext
  *    eras, v0.4.0) used ONLY to decrypt old-era envelopes — never for
  *    encryption (see [activateHistorical]);
  *  - enforce a fixed lifetime per session (no sliding renewal — the countdown
- *    starts at unlock);
+ *    starts at unlock; an explicit timeout CHANGE re-arms every live
+ *    session, v1.3.1);
  *  - wipe key material on lock, replacement and expiry;
  *  - guarantee isolation: a key derived for contact A is never returned for
  *    contact B (see KeySessionManagerTest).
@@ -48,15 +50,24 @@ class KeySessionManager(
 
     private class Entry(
         val sessionKey: SessionKey,
-        val expiresAtMillis: Long,
-    )
+        val unlockedAtMillis: Long,
+        val timeoutMillis: Long,
+    ) {
+        /** v1.3.1: evaluated against the LIVE fields, not a frozen deadline —
+         * the countdown starts at unlock and an explicit timeout change
+         * re-arms it (see [rearmTimeout]). */
+        fun expiresAtMillis(): Long = KeyPolicy.sessionDeadline(unlockedAtMillis, timeoutMillis)
+    }
 
     /** Historical variant: carries its contact so lock(contact) can wipe it. */
     private class HistEntry(
         val contactId: ContactId,
         val sessionKey: SessionKey,
-        val expiresAtMillis: Long,
-    )
+        val unlockedAtMillis: Long,
+        val timeoutMillis: Long,
+    ) {
+        fun expiresAtMillis(): Long = KeyPolicy.sessionDeadline(unlockedAtMillis, timeoutMillis)
+    }
 
     /**
      * v0.4.2 (deep-scan N1/N2): monotonic change counter for the manager's
@@ -132,7 +143,11 @@ class KeySessionManager(
             params = params,
             keyBytes = keyBytes.copyOf(),
         )
-        active[contactId] = Entry(sessionKey, timeSource.nowMillis() + timeoutMillis)
+        active[contactId] = Entry(
+            sessionKey,
+            timeSource.nowMillis(),
+            KeyPolicy.clampSessionTimeout(timeoutMillis),
+        )
         bumpSessionChangesLocked()
         sessionKey
     }
@@ -144,7 +159,7 @@ class KeySessionManager(
      */
     suspend fun activeSession(contactId: ContactId): SessionKey? = mutex.withLock {
         val entry = active[contactId] ?: return@withLock null
-        if (entry.expiresAtMillis <= timeSource.nowMillis()) {
+        if (entry.expiresAtMillis() <= timeSource.nowMillis()) {
             active.remove(contactId)
             wipe(entry.sessionKey)
             bumpSessionChangesLocked()
@@ -196,7 +211,12 @@ class KeySessionManager(
             params = params,
             keyBytes = keyBytes.copyOf(),
         )
-        historical[sessionId] = HistEntry(contactId, sessionKey, timeSource.nowMillis() + timeoutMillis)
+        historical[sessionId] = HistEntry(
+            contactId,
+            sessionKey,
+            timeSource.nowMillis(),
+            KeyPolicy.clampSessionTimeout(timeoutMillis),
+        )
         bumpSessionChangesLocked()
         sessionKey
     }
@@ -209,7 +229,7 @@ class KeySessionManager(
      */
     suspend fun historicalSession(sessionId: SessionId): SessionKey? = mutex.withLock {
         val entry = historical[sessionId] ?: return@withLock null
-        if (entry.expiresAtMillis <= timeSource.nowMillis()) {
+        if (entry.expiresAtMillis() <= timeSource.nowMillis()) {
             historical.remove(sessionId)
             wipe(entry.sessionKey)
             bumpSessionChangesLocked()
@@ -268,7 +288,65 @@ class KeySessionManager(
     /** Absolute expiry timestamp of the contact's session, or null. */
     suspend fun expiryOf(contactId: ContactId): Long? = mutex.withLock {
         sweepExpiredLocked()
-        active[contactId]?.expiresAtMillis
+        active[contactId]?.expiresAtMillis()
+    }
+
+    /**
+     * v1.3.1 (lock-time fix): applies a NEW timeout to every live session —
+     * active AND historical.
+     *
+     * Before this, the timeout was read exactly once (at unlock) and frozen
+     * into an absolute deadline, so changing it in Settings did nothing to
+     * already-unlocked sessions: tightening 24 h → 1 min left them live for
+     * hours, and the 60 s sweeper kept honouring the stale deadline too.
+     *
+     * Semantics — the new value applies as if it had been the setting AT
+     * UNLOCK: the anchor (unlockedAt) is kept and the deadline re-evaluated
+     * as `unlockedAt + newTimeout`, so the module's doctrine "no sliding
+     * renewal, the countdown starts at unlock" survives the change and a
+     * session can never gain lifetime beyond the new setting's intent:
+     *  - tightening: a session whose elapsed lifetime already exceeds the
+     *    new timeout is wiped IMMEDIATELY (a tightening must be able to
+     *    LOCK, not merely shorten future lifetimes);
+     *  - extending: live sessions get the fuller budget from their original
+     *    anchor — but a session already expired under its OLD deadline is
+     *    wiped first and never resurrected (the user re-enters the
+     *    passphrase).
+     *
+     * Returns the number of sessions the new value was applied to. Wipes
+     * bump the sessionChanges counter (the unlocked set changed); a change
+     * with nothing live is a no-op and bumps nothing.
+     */
+    suspend fun rearmTimeout(newTimeoutMillis: Long): Int = mutex.withLock {
+        // 1. Wipe sessions already past their OLD deadlines FIRST — an
+        //    extension must never reach back and revive an expired session.
+        sweepExpiredLocked()
+
+        // 2. Swap the duration on every survivor; the anchor is kept. The
+        //    iterator's setValue keeps the maps structurally intact.
+        val clamped = KeyPolicy.clampSessionTimeout(newTimeoutMillis)
+        var applied = 0
+        val activeIterator = active.entries.iterator()
+        while (activeIterator.hasNext()) {
+            val entry = activeIterator.next()
+            entry.setValue(Entry(entry.value.sessionKey, entry.value.unlockedAtMillis, clamped))
+            applied++
+        }
+        val historicalIterator = historical.entries.iterator()
+        while (historicalIterator.hasNext()) {
+            val entry = historicalIterator.next()
+            entry.setValue(
+                HistEntry(entry.value.contactId, entry.value.sessionKey, entry.value.unlockedAtMillis, clamped),
+            )
+            applied++
+        }
+
+        // 3. Sweep again under the NEW deadlines: a tightening may condemn
+        //    sessions whose elapsed lifetime already exceeds the new
+        //    budget — they must wipe NOW, not at the next query/sweep.
+        //    (bumps the counter only when it actually wipes something).
+        sweepExpiredLocked()
+        applied
     }
 
     /**
@@ -291,14 +369,14 @@ class KeySessionManager(
     private fun sweepExpiredLocked(): Int {
         val now = timeSource.nowMillis()
         var swept = 0
-        val expired = active.filterValues { it.expiresAtMillis <= now }.keys
+        val expired = active.filterValues { it.expiresAtMillis() <= now }.keys
         expired.forEach { id ->
             active.remove(id)?.let {
                 wipe(it.sessionKey)
                 swept++
             }
         }
-        val expiredHist = historical.filterValues { it.expiresAtMillis <= now }.keys
+        val expiredHist = historical.filterValues { it.expiresAtMillis() <= now }.keys
         expiredHist.forEach { id ->
             historical.remove(id)?.let {
                 wipe(it.sessionKey)
