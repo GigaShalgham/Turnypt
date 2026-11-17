@@ -51,14 +51,6 @@ data class GlassColors(
     /** The quiet backdrop the glass samples (light: frost, dark: night). */
     val backdropTop: Color,
     val backdropBottom: Color,
-    /**
-     * v1.5.4: the violet ambient bloom rising from the foot of the
-     * backdrop — the lit atmosphere under the floating bar, replacing the
-     * flat black/white field that read as an extra sheet.
-     */
-    val backdropBloom: Color,
-    /** v1.5.4: the bloom's warmest point, right at the screen's foot. */
-    val backdropBloomStrong: Color,
     /** v1.5.0: the soft ambient shadow the glass casts (diffused, low). */
     val shadowColor: Color,
 )
@@ -77,13 +69,13 @@ val LightGlass = GlassColors(
     border = Color(0x478256C7),
     highlight = Color(0x5CE8DDF9),
     navTint = Color(0xB8FFFFFF),
-    backdropTop = Color(0xFFEDE7F5),
+    // v1.5.5: the light backdrop is a UNIFORM warm-white field — the
+    // same colour top to bottom. The old two-tone (lilac crown over
+    // white foot) tinted the screen's lower region violet by design,
+    // and every "extra band under the bar" report traced back to that
+    // deliberately uneven field. One quiet field, one material.
+    backdropTop = Color(0xFFFAF8FD),
     backdropBottom = Color(0xFFFAF8FD),
-    // v1.5.4 light bloom: the white field's foot warms with the same
-    // lilac the glass rims carry — the bar's region becomes lit
-    // atmosphere, not a raw white sheet.
-    backdropBloom = Color(0xFFF3EEF9),
-    backdropBloomStrong = Color(0xFFEFE8F6),
     shadowColor = Color(0x2E4A3B76),
 )
 
@@ -104,16 +96,22 @@ val DarkGlass = GlassColors(
     tintHigh = Color(0x992A2440),
     border = Color(0x47B18AFB),
     highlight = Color(0x33B18AFB),
-    navTint = Color(0x59171522),
-    backdropTop = Color(0xFF0E0C15),
-    backdropBottom = Color(0xFF171522),
-    // v1.5.4 dark bloom: the plum-black field's foot lifts toward the
-    // primary violet — the region the bar floats in reads as ambient
-    // LIGHT, not a raw black page. The stops stay deep (221D33/2A2440
-    // territory) so OLED contrast is kept and the bloom is felt as
-    // depth, never seen as a stripe.
-    backdropBloom = Color(0xFF1C1828),
-    backdropBloomStrong = Color(0xFF221D33),
+    // v1.5.5: a transparent bar pane must sit on a colour it does not
+    // shift — the old navTint was a wash OF the backdrop's plum foot,
+    // so bar-over-plum stacked into the reported purple band. The tint
+    // is now the scheme's OWN neutral background colour (12101A), the
+    // exact field the cards sit on.
+    navTint = Color(0x5912101A),
+    // v1.5.5: the dark backdrop is a UNIFORM near-black field top to
+    // bottom — the scheme's own background (12101A). The previous
+    // two-tone (0E0C15 crown over a PLUM 171522 foot) plus the v1.5.4
+    // "violet bloom" experiment BOTH spent the screen's lower region on
+    // progressively purple-er colour — which is precisely what kept
+    // reading as "an extra purple block between the menu and the texts".
+    // A backdrop is the room, not a decoration: one quiet neutral field,
+    // and the glass's presence comes from rim + shadow alone.
+    backdropTop = Color(0xFF12101A),
+    backdropBottom = Color(0xFF12101A),
     shadowColor = Color(0x5C000000),
 )
 
@@ -197,31 +195,25 @@ private fun highlightBrushColor(glass: GlassColors, tint: Color): Color =
     glass.highlight.copy(alpha = glass.highlight.alpha * (tint.alpha / 1f).coerceIn(0.4f, 1f))
 
 /**
- * The quiet two-tone backdrop every screen sits on — the glass samples it
- * for depth. Applied once around the app content, never per-card.
+ * The quiet backdrop every screen sits on. Applied once around the app
+ * content, never per-card.
  *
- * v1.5.4 (user report: "the black (or white, theme-dependent) page between
- * the glass menu and the texts is STILL there, though smaller"): the old
- * two-stop gradient spent the whole LOWER half of the screen on one flat
- * colour — a raw plum-black page under the dark theme, a raw white page
- * under the light one — and that flat field is what read as "an extra
- * black/white sheet" sitting between the floating bar and the content.
- * A backdrop is AMBIENT LIGHT, not a painted wall: a violet bloom now
- * rises from the foot of the field (where the bar floats) and an even
- * quieter one glows at the crown, so the region under the bar belongs to
- * the same lit atmosphere the cards live in instead of forming its own
- * flat band. The stops are tuned so the bloom is FELT as depth, never
- * seen as a stripe.
+ * v1.5.5 (user report, fourth strike: "the extra purple block between
+ * the menu and the page elements at the bottom is STILL there"): this
+ * time the diagnosis went to the actual PIXELS under the bar, and the
+ * finding is humbling — every previous "fix" ADDED colour to the screen's
+ * lower region instead of removing it. v1.5.4's violet bloom painted a
+ * literal purple gradient there; before it, the two-tone field itself
+ * put a PLUM foot (171522) under a near-black crown; and the bar's own
+ * tint was a wash OF that plum, stacking two purples. The backdrop is
+ * now ONE uniform neutral field (the scheme's own background colour,
+ * top to bottom) and the bar's tint samples that same neutral. There is
+ * no second colour anywhere near the screen's foot, so no region can
+ * read as "an extra block". The glass keeps its presence through the
+ * violet rim and the soft shadow — light, not paint.
  */
 fun Modifier.glassBackdrop(glass: GlassColors): Modifier =
-    background(
-        Brush.verticalGradient(
-            0.00f to glass.backdropTop,
-            0.62f to glass.backdropBottom,
-            0.86f to glass.backdropBloom,
-            1.00f to glass.backdropBloomStrong,
-        )
-    )
+    background(glass.backdropTop)
 
 /**
  * REAL Liquid-Glass backdrop blur, where Android genuinely provides it:

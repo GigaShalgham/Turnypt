@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.5] - 2026-11-17 — the band, diagnosed at the pixels (prerelease)
+
+### The purple block between the menu and the page elements
+
+Fourth report, and this time the diagnosis went to the actual pixels
+under the bar instead of to another theory. The finding is humbling:
+every previous "fix" ADDED colour to the screen's lower region instead
+of removing it.
+
+- v1.5.4's "violet ambient bloom" painted a literal purple gradient
+  across the screen's foot — the fix WAS the new purple block.
+- The two-tone backdrop itself put a PLUM foot (0xFF171522) under a
+  near-black crown (0xFF0E0C15): the screen's lower half was
+  purple-er than its top BY DESIGN.
+- The bar's own tint was a wash OF that plum (0x59171522), stacking a
+  second purple over the field's purple.
+
+The backdrop is now ONE uniform neutral field top to bottom — the
+scheme's own background colour (0xFF12101A dark / 0xFFFAF8FD light) —
+and the bar's tint samples that same neutral (0x5912101A). There is no
+second colour anywhere near the screen's foot, so no region can read
+as "an extra block". The glass keeps its presence through the violet
+rim and the soft shadow: light, not paint.
+
+### Home screen buttons
+
+The quick-action tiles' content (medallion + label) was pinned to the
+tile's top-start corner — a Box without contentAlignment — so the
+values sat huddled in the corner with dead space around them, glaring
+on wide tiles (tablets, landscape, two-per-row weights). The content is
+now centred on both axes. The status chips' asymmetric padding
+(start=8/end=12) read as the text being pushed off-centre inside the
+pill; it is now symmetric.
+
+versionCode 28 / versionName 1.5.5. Full matrix 496 tests green.
+
 ## [1.5.4] - 2026-11-17 — the shortcut fingerprint & the last band (prerelease)
 
 ### Fingerprint on the shortcut-opened decrypt sheet

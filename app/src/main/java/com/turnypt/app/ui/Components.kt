@@ -151,7 +151,10 @@ fun StatusChip(
         ),
     ) {
         Row(
-            modifier = Modifier.padding(start = 8.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
+            // v1.5.5: symmetric padding — the old start=8/end=12 (an RTL
+            // artifact of the icon's medallion overhang) read as the
+            // text being pushed off-centre inside the pill.
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -233,6 +236,13 @@ fun QuickActionTile(
                     pressed = false
                 }
             },
+        // v1.5.5 (user report: "the values in each button on the Home
+        // screen are not in the button's centre"): a Box without
+        // contentAlignment pins its child to the top-start corner, so the
+        // medallion + label sat huddled in the tile's corner with the
+        // rest dead space — glaring on wide tiles (tablets, landscape,
+        // two-per-row weights). Center the content BOTH axes.
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
