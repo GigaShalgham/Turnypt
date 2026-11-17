@@ -27,15 +27,15 @@
 
         <!-- side leaves (deeper green); bases tuck under the bulb crown -->
         <path
-            android:fillColor="#4E9A57"
+            android:fillColor="#718D5B"
             android:pathData="M51.5,40 Q48.9,29.5 39.2,26.8 Q41.9,36.6 51.5,40 Z" />
         <path
-            android:fillColor="#4E9A57"
+            android:fillColor="#718D5B"
             android:pathData="M56.5,40 Q59.1,29.5 68.8,26.8 Q66.1,36.6 56.5,40 Z" />
 
         <!-- center leaf (fresh light green) -->
         <path
-            android:fillColor="#93D489"
+            android:fillColor="#A3B98A"
             android:pathData="M54,39.5 C50,32.5 50,27 54,24.2 C58,27 58,32.5 54,39.5 Z" />
 
         <!-- turnip bulb: flat crown, blunt taper to the root point -->
@@ -46,7 +46,7 @@
         <!-- keyhole: ONE continuous path (circle arc over the top merges
              into the flared wedge) — no seam, no even-odd overlap holes -->
         <path
-            android:fillColor="#331B52"
+            android:fillColor="#2A2440"
             android:pathData="M47.1,60.5 A8,8 0 1,1 60.9,60.5 L63.5,72.5 L44.5,72.5 Z" />
     </group>
 </vector>

@@ -1,5 +1,6 @@
 package com.turnypt.app.ui
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -196,9 +197,14 @@ fun QuickActionTile(
 ) {
     val glass = LocalGlassTokens.current
     var pressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
+    // v1.5.0 perf: no-bouncy spring + deferred read — the press scale
+    // repaints one layer; the tile content never recomposes.
+    val scale = animateFloatAsState(
         targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = 400f),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            visibilityThreshold = 0.01f,
+        ),
         label = "tilePress",
     )
     val shape = RoundedCornerShape(GlassRadii.card)
@@ -207,8 +213,8 @@ fun QuickActionTile(
             .fillMaxWidth()
             .heightIn(min = 88.dp)
             .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
+                scaleX = scale.value
+                scaleY = scale.value
             }
             .glassSurface(glass, shape)
             .clickable(

@@ -15,30 +15,33 @@ import androidx.compose.ui.unit.sp
 import com.turnypt.keyboard.R
 
 // Compact Material palette local to the IME (the keyboard module keeps its
-// own theme so it never depends on the app module).
+// own theme so it never depends on the app module). v1.5.0 Turnip: the
+// keyboard follows the app's purple-dominant identity — plum field, lavender
+// primary, green reserved (not used here; the app keeps the one green
+// channel for the success semantic).
 private val ImeDark = darkColorScheme(
-    primary = Color(0xFF5B8DEF),
-    onPrimary = Color(0xFFFFFFFF),
-    background = Color(0xFF16161C),
-    onBackground = Color(0xFFE4E4EC),
-    surface = Color(0xFF1C1C24),
-    onSurface = Color(0xFFE4E4EC),
-    surfaceVariant = Color(0xFF2A2A34),
-    onSurfaceVariant = Color(0xFFE4E4EC),
-    outline = Color(0xFF3A3A46),
+    primary = Color(0xFFB18AFB),        // Turnip Primary
+    onPrimary = Color(0xFF2A1E4F),
+    background = Color(0xFF12101A),      // Turnip Background
+    onBackground = Color(0xFFF1EDF8),    // Turnip Primary Text
+    surface = Color(0xFF1C1928),        // Turnip Surface
+    onSurface = Color(0xFFF1EDF8),
+    surfaceVariant = Color(0xFF292338), // Turnip Elevated Surface
+    onSurfaceVariant = Color(0xFFC3BDD2),
+    outline = Color(0xFF353044),        // Turnip Dividers
     error = Color(0xFFE25B5B),
 )
 
 private val ImeLight = lightColorScheme(
-    primary = Color(0xFF2E4A80),
+    primary = Color(0xFF8256C7),        // Turnip Primary
     onPrimary = Color(0xFFFFFFFF),
-    background = Color(0xFFF2F3F8),
-    onBackground = Color(0xFF1A1A22),
-    surface = Color(0xFFEDEFF5),
-    onSurface = Color(0xFF1A1A22),
-    surfaceVariant = Color(0xFFDDE1EA),
-    onSurfaceVariant = Color(0xFF1A1A22),
-    outline = Color(0xFFC6CAD6),
+    background = Color(0xFFFAF8FD),    // Turnip Background
+    onBackground = Color(0xFF24212C),  // Turnip Primary Text
+    surface = Color(0xFFFFFFFF),       // Turnip Surface
+    onSurface = Color(0xFF24212C),
+    surfaceVariant = Color(0xFFF0EAF9), // Turnip Elevated Surface
+    onSurfaceVariant = Color(0xFF4E4A5A),
+    outline = Color(0xFFE8E2EF),       // Turnip Dividers
     error = Color(0xFFB23B3B),
 )
 

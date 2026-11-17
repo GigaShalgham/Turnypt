@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -41,7 +42,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.core.content.FileProvider
 import java.io.File
 import com.turnypt.app.R
@@ -99,10 +102,16 @@ fun ToolSegmentRow(
 ) {
     val glass = LocalGlassTokens.current
     val shape = RoundedCornerShape(GlassRadii.pill)
-    // The indicator slides between the two halves of the track.
-    val indicatorFraction by animateFloatAsState(
+    // The indicator slides between the two halves of the track. v1.5.0
+    // perf: critically damped (no overshoot), and the animated value is
+    // read only inside the offset lambda (deferred read) — the animation
+    // repaints one layer, it never recomposes the options.
+    val indicatorFraction = animateFloatAsState(
         targetValue = if (imageSelected) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 380f),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            visibilityThreshold = 0.01f,
+        ),
         label = "segmentIndicator",
     )
     // v1.4.1 bugfix: the Row of options is the size-defining child; the
@@ -119,7 +128,7 @@ fun ToolSegmentRow(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .offset(x = halfWidth * indicatorFraction),
+                .offset { IntOffset(x = (halfWidth.toPx() * indicatorFraction.value).roundToInt(), y = 0) },
         ) {
             Box(
                 modifier = Modifier

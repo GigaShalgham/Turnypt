@@ -9,6 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-17 — the Turnip identity (prerelease)
+
+A visual-identity pass on the v1.4.0 structure — **same layout, same
+components, same interaction model** (per the brief: "Preserve the design.
+Elevate its visual identity. Refine its execution.").
+
+### The Turnip palette
+
+Purple-dominant, green occasional; premium and restrained, never neon.
+Dark: plum-black field `#12101A` / surface `#1C1928` / elevated
+`#292338`, lavender primary `#B18AFB`, secondary purple `#9470D8`,
+secondary green `#A3B98A`, accent `#DCCAFF`. Light: violet-warmed white
+`#FAF8FD` / `#FFFFFF` / `#F0EAF9`, primary `#8256C7`, secondary purple
+`#A17AD9`, secondary green `#718D5B`, accent `#E8DDF9`. Every brief hex
+anchors its role; the derived roles keep every on/container pair ≥ 4.5:1
+(38 pairs audited worst-case over both backdrop bounds — worst 4.85:1).
+
+The semantic SUCCESS channel is now the Turnip green — the one green in
+the identity, reserved for the unlocked/secure state. The floating
+assistant overlay and the IME theme follow the same hexes.
+
+### Lighting & depth
+
+- Purple ambient light: glass tints and rims carry violet; the specular
+  bevel is restrained (accent at low alpha — a ceiling light, not a
+  glow).
+- Every glass surface now casts ONE soft, diffused ambient shadow
+  (6dp, low alpha, shadow color per theme) — depth without crisp or
+  stacked shadows.
+- Two-tone backdrops shift violet (#EDE7F5→#FAF8FD light,
+  #0E0C15→#171522 dark) — the ambient purple the glass samples.
+
+### Bottom navigation — smoothness & insets
+
+- **Fixes the system-nav overlap**: the floating bar now insets itself
+  above the Android navigation bar via `WindowInsets` navigation-bars
+  padding — correct under gesture nav AND three-button nav, edge-to-edge
+  safe at targetSdk 36, no hardcoded device offsets.
+- Perf: the sliding selection pill and the icon scale animations are
+  **deferred state reads** (read inside `offset`/`graphicsLayer`
+  lambdas) — an animating pill repaints one layer and no longer
+  recomposes the five slots. Springs are critically damped
+  (`DampingRatioNoBouncy`) with tight visibility thresholds: the pill
+  lands immediately, no overshoot, no bounce. Same treatment for the
+  Text|Image indicator and the quick-tile press scale.
+
+No behaviour change: routes, flows, tests, security surfaces untouched.
+
 ## [1.4.1] - 2026-11-17 — the invisible navigation bugfix
 
 ### Fixed

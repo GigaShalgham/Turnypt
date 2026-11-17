@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -50,29 +51,34 @@ data class GlassColors(
     /** The quiet backdrop the glass samples (light: frost, dark: night). */
     val backdropTop: Color,
     val backdropBottom: Color,
+    /** v1.5.0: the soft ambient shadow the glass casts (diffused, low). */
+    val shadowColor: Color,
 )
 
 val LightGlass = GlassColors(
-    // Frost-white glass: opaque enough to read as a surface, translucent
-    // enough for the backdrop's tone to shift beneath it.
+    // v1.5.0 Turnip: white-violet glass on the warm-white field — purple
+    // ambient light without saturation; the rim is a violet hairline.
     tint = Color(0xB8FFFFFF),
-    tintHigh = Color(0xD8F0F2FA),
-    border = Color(0x66FFFFFF),
-    highlight = Color(0xB4FFFFFF),
-    navTint = Color(0xC8FFFFFF),
-    backdropTop = Color(0xFFE9EDF9),
-    backdropBottom = Color(0xFFF7F8FC),
+    tintHigh = Color(0xE8F0EAF9),
+    border = Color(0x478256C7),
+    highlight = Color(0x5CE8DDF9),
+    navTint = Color(0xD8FFFFFF),
+    backdropTop = Color(0xFFEDE7F5),
+    backdropBottom = Color(0xFFFAF8FD),
+    shadowColor = Color(0x2E4A3B76),
 )
 
 val DarkGlass = GlassColors(
-    // Night glass: smoky, with a brighter rim so the edge reads on OLED.
-    tint = Color(0x66262A3E),
-    tintHigh = Color(0x992E3346),
-    border = Color(0x40FFFFFF),
-    highlight = Color(0x30FFFFFF),
-    navTint = Color(0x90202438),
-    backdropTop = Color(0xFF101320),
-    backdropBottom = Color(0xFF171A2A),
+    // v1.5.0 Turnip: plum-smoke glass over the plum-black field; the rim
+    // is violet (not white) so the edge reads as light, not chalk.
+    tint = Color(0x66221D33),
+    tintHigh = Color(0x992A2440),
+    border = Color(0x47B18AFB),
+    highlight = Color(0x33B18AFB),
+    navTint = Color(0x8A1F1B31),
+    backdropTop = Color(0xFF0E0C15),
+    backdropBottom = Color(0xFF171522),
+    shadowColor = Color(0x5C000000),
 )
 
 /** Provided by [TurnyptTheme]; read as `LocalGlassColors.current`. */
@@ -93,12 +99,16 @@ object GlassRadii {
 }
 
 /**
- * The glass material as ONE modifier chain: clip → tint fill → specular
- * bevel → refraction border. `drawBehind` keeps tint and bevel UNDER the
- * content; the border stroke draws over the clipped edge.
+ * The glass material as ONE modifier chain: clip → soft diffused shadow →
+ * tint fill → specular bevel → refraction border. `drawBehind` keeps tint
+ * and bevel UNDER the content; the border stroke draws over the clipped
+ * edge.
  *
- * No per-frame blur: real backdrop blur is only available at the WINDOW
- * level (see [applyWindowBackgroundBlur]), and in-app surfaces get honest
+ * v1.5.0 Turnip lighting: depth comes from ONE soft, diffused ambient
+ * shadow (large blur, low alpha — never stacked, never crisp) plus the
+ * restrained violet rim; the specular bevel stays quiet. No per-frame
+ * blur: real backdrop blur is only available at the WINDOW level (see
+ * [applyWindowBackgroundBlur]), and in-app surfaces get honest
  * translucency — the performance-conscious reading of the brief.
  */
 fun Modifier.glassSurface(
@@ -107,10 +117,18 @@ fun Modifier.glassSurface(
     tint: Color = glass.tint,
 ): Modifier = this
     .clip(shape)
+    .shadow(
+        elevation = 6.dp,
+        shape = shape,
+        clip = false,
+        ambientColor = glass.shadowColor,
+        spotColor = glass.shadowColor,
+    )
     .drawBehind {
         drawRect(brush = Brush.verticalGradient(listOf(tint, tint)))
         // Specular bevel: the top 45% (max 56dp) fades out — a curved
-        // highlight, not a flat stripe.
+        // highlight, not a flat stripe. Restrained alpha: a ceiling light,
+        // not a glow.
         val bevelHeight = (size.height * 0.45f).coerceAtMost(56.dp.toPx())
         drawRect(
             brush = Brush.verticalGradient(

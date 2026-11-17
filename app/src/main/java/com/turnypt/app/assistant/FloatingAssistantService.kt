@@ -160,15 +160,14 @@ class FloatingAssistantService : Service() {
             y = (220 * density).toInt()
         }
 
-        // The collapsed bubble — v1.4.0 Liquid Glass: the brand aubergine
-        // deepens to the night-glass tone with a light rim stroke, so the
-        // circle reads as a glass bead, not a flat disc.
+        // The collapsed bubble — v1.5.0 Turnip: plum-glass bead with a
+        // violet rim (the refraction edge reads as light, not chalk).
         val bubbleView = ImageView(this).apply {
             setImageResource(R.drawable.ic_assistant_lock)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.argb(238, 30, 34, 54))
-                setStroke((1 * density).toInt(), Color.argb(96, 255, 255, 255))
+                setColor(Color.argb(238, 28, 25, 40))       // #1C1928 Surface
+                setStroke((1 * density).toInt(), Color.argb(120, 177, 138, 251)) // #B18AFB rim
             }
             layoutParams = FrameLayout.LayoutParams(
                 (48 * density).toInt(),
@@ -196,18 +195,17 @@ class FloatingAssistantService : Service() {
 
     /** Vertical action panel — header with ✕, labeled rows, hint footer.
      *
-     * v1.4.0 Liquid Glass: the panel is the dark-glass material — deeper
-     * translucency, a 26dp radius, a light refraction rim, and the rows
-     * ripple over quiet wells instead of a flat plate. The expand/collapse
-     * now animates (scale + fade, 160ms — restrained).
+     * v1.5.0 Turnip: the panel is plum-glass (#1C1928 @ 92% alpha) with a
+     * violet hairline rim; rows ripple over quiet violet wells. The
+     * expand/collapse animation stays the restrained 160ms scale+fade.
      */
     private fun buildPanel(density: Float): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 cornerRadius = 26 * density
-                setColor(Color.argb(236, 22, 25, 38))
-                setStroke((1 * density).toInt(), Color.argb(64, 255, 255, 255))
+                setColor(Color.argb(235, 28, 25, 40))      // #1C1928 Surface
+                setStroke((1 * density).toInt(), Color.argb(72, 177, 138, 251)) // #B18AFB rim
             }
             val hPad = (6 * density).toInt()
             val vPad = (10 * density).toInt()
@@ -272,7 +270,7 @@ class FloatingAssistantService : Service() {
                 TextView(this@FloatingAssistantService).apply {
                     text = getString(R.string.assistant_hint)
                     textSize = 11f
-                    setTextColor(Color.argb(200, 168, 176, 200))
+                    setTextColor(Color.argb(200, 166, 160, 179))  // #A6A0B3 Secondary Text
                     typeface = regularTypeface
                     setPadding(
                         (12 * density).toInt(),
@@ -307,7 +305,7 @@ class FloatingAssistantService : Service() {
                 TextView(this@FloatingAssistantService).apply {
                     text = getString(R.string.assistant_panel_title)
                     textSize = 12f
-                    setTextColor(Color.argb(190, 168, 176, 200))
+                    setTextColor(Color.argb(190, 177, 138, 251))  // #B18AFB Primary
                     typeface = mediumTypeface
                     layoutParams = LinearLayout.LayoutParams(
                         0,
@@ -396,7 +394,7 @@ class FloatingAssistantService : Service() {
                 TextView(this@FloatingAssistantService).apply {
                     text = getString(labelRes)
                     textSize = 15f
-                    setTextColor(Color.argb(245, 233, 236, 248))
+                    setTextColor(Color.argb(245, 241, 237, 248))  // #F1EDF8 Primary Text
                     typeface = mediumTypeface
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,

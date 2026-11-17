@@ -1,5 +1,6 @@
 package com.turnypt.app.ui
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -31,8 +33,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavArgument
@@ -161,9 +165,14 @@ fun TurnyptApp() {
         }
 
         // The floating glass navigation bar, pinned above the content.
+        // v1.5.0 (user brief §5): respect the system navigation bar's
+        // WindowInsets — edge-to-edge is enforced at targetSdk 36, so the
+        // bar must inset itself above the gesture pill / 3-button strip
+        // on every device, with no hardcoded per-device offsets.
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             FloatingGlassNavBar(
@@ -227,11 +236,17 @@ private fun FloatingGlassNavBar(
         .coerceAtLeast(0)
 
     // The selection pill slides between the five slots; fraction in
-    // [0, 4]. A restrained spring (high stiffness, little overshoot) —
-    // liquid, not bouncy.
-    val selectionFraction by animateFloatAsState(
+    // [0, 4]. v1.5.0 (user brief §4): critically damped (NO overshoot —
+    // no bounce), high stiffness — the pill lands immediately and the
+    // motion stays cheap. The animated value is read ONLY inside the
+    // offset/graphicsLayer lambdas (deferred state reads): a running
+    // animation repaints the layer, it never recomposes the slots.
+    val selectionFraction = animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 500f),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            visibilityThreshold = 0.01f,
+        ),
         label = "navSelection",
     )
 
@@ -248,10 +263,18 @@ private fun FloatingGlassNavBar(
     ) {
         val slotWidth = maxWidth / destinations.size
         // The sliding selection pill under the active slot's content.
+        // v1.5.0 perf: the offset reads the animation INSIDE the lambda
+        // (deferred read) — each frame is a layer translate only; the
+        // five slots never recompose while the pill glides.
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .offset(x = slotWidth * selectionFraction),
+                .offset {
+                    IntOffset(
+                        x = (slotWidth.toPx() * selectionFraction.value).roundToInt(),
+                        y = 0,
+                    )
+                },
         ) {
             Box(
                 modifier = Modifier
@@ -290,10 +313,15 @@ private fun NavBarSlot(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    // The active icon settles a hair larger — quiet emphasis.
-    val iconScale by animateFloatAsState(
-        targetValue = if (selected) 1.08f else 1f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 500f),
+    // The active icon settles a hair larger — quiet emphasis. v1.5.0 perf:
+    // no-bouncy spring, and the scale is read only inside the
+    // graphicsLayer lambda — the animation never recomposes the slot.
+    val iconScale = animateFloatAsState(
+        targetValue = if (selected) 1.06f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            visibilityThreshold = 0.01f,
+        ),
         label = "navIconScale",
     )
     Column(
@@ -315,8 +343,8 @@ private fun NavBarSlot(
             modifier = Modifier
                 .size(22.dp)
                 .graphicsLayer {
-                    scaleX = iconScale
-                    scaleY = iconScale
+                    scaleX = iconScale.value
+                    scaleY = iconScale.value
                 },
         )
         Text(

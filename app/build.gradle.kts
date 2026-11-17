@@ -31,8 +31,8 @@ android {
         applicationId = "com.turnypt"
         minSdk = 26
         targetSdk = 36
-        versionCode = 22
-        versionName = "1.4.1"
+        versionCode = 23
+        versionName = "1.5.0"
 
         vectorDrawables {
             useSupportLibrary = true
