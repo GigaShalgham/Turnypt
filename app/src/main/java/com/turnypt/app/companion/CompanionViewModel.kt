@@ -152,13 +152,34 @@ class CompanionViewModel @Inject constructor(
     /**
      * v0.4.2 (deep-scan N2): drops stale `unlocked` entries and recomputes
      * the fingerprint offer for the phase that is on screen.
+     *
+     * v1.5.8: only for screens whose contacts list is actually loaded.
+     * The DECRYPT flow never loads it (the envelope resolves its own
+     * contact — see startDecryptFlow), so a resync fired there by the
+     * unlock's own sessionChanges bump computed `live` over an EMPTY list
+     * and clobbered the just-written `unlocked + contactId` — the sheet
+     * flipped back to "locked" the very moment the unlock succeeded, and
+     * the fingerprint offer retracted with it. The resync's job (drop
+     * STALE entries when another surface locked/rotated) only exists when
+     * the sheet knows the contact set to begin with.
      */
     private fun resyncSessionState() {
         launchSafely {
-            val live = _state.value.contacts.map { it.id }
-                .filter { messageCipher.isUnlocked(it) }
-                .toSet()
-            _state.value = _state.value.copy(unlocked = live)
+            if (_state.value.contacts.isNotEmpty()) {
+                val live = _state.value.contacts.map { it.id }
+                    .filter { messageCipher.isUnlocked(it) }
+                    .toSet()
+                _state.value = _state.value.copy(unlocked = live)
+            } else if (_state.value.pendingContactId != null) {
+                // Decrypt flow: keep the pending contact's live state honest
+                // instead — a lockAll() elsewhere must still retract it.
+                val id = _state.value.pendingContactId!!
+                if (!messageCipher.isUnlocked(id)) {
+                    _state.value = _state.value.copy(
+                        unlocked = _state.value.unlocked - id,
+                    )
+                }
+            }
             val phase = _state.value.phase
             if (phase == CompanionUiState.Phase.NeedsUnlock ||
                 phase == CompanionUiState.Phase.Prepare
@@ -401,9 +422,46 @@ class CompanionViewModel @Inject constructor(
                 return@launchSafely
             }
             pendingPromptKey = contactKey
+            // v1.5.8 (user report: "decrypting from the text-selection
+            // menu: neither the passphrase nor the fingerprint unlocks
+            // the contact's lock — only decryption; encryption works"):
+            // the fingerprint path never armed the continuation. The
+            // passphrase path (unlockThen) stashes `afterUnlock` before
+            // its work so a SUCCESSFUL unlock re-runs what NeedsUnlock
+            // interrupted (decryptInternal(envelope) / encryptNow()).
+            // requestBiometricUnlock did not — the prompt succeeded, the
+            // session key activated… and the sheet stayed on the unlock
+            // card with nothing re-run: THE reported bug. Arm the same
+            // continuation here, derived from the CURRENT phase exactly
+            // like unlockAndDecrypt/unlockAndEncrypt derive theirs.
+            afterUnlock = continuationForBiometricUnlock()
             _state.value = _state.value.copy(
                 biometricPrompt = BiometricPromptRequest.Unlock(contactKey),
             )
+        }
+    }
+
+    /**
+     * v1.5.8: the continuation a successful FINGERPRINT unlock should run —
+     * the exact work the passphrase path's `afterUnlock` would run for the
+     * state on screen. NeedsUnlock (decrypt): re-decrypt the envelope;
+     * Prepare (encrypt, clipboard/assistant launches): encrypt the draft.
+     * Null = the prompt still serves a contact unlock with nothing queued
+     * (a standalone open from the contacts sheet).
+     */
+    private fun continuationForBiometricUnlock(): (suspend () -> Unit)? {
+        val s = _state.value
+        return when (s.phase) {
+            CompanionUiState.Phase.NeedsUnlock -> {
+                val id = s.pendingContactId ?: return null
+                val envelope = s.incoming ?: return null
+                { decryptInternal(envelope) }
+            }
+            CompanionUiState.Phase.Prepare -> {
+                if (s.mode != CompanionMode.ENCRYPT) return null
+                { encryptNow() }
+            }
+            else -> null
         }
     }
 
@@ -459,7 +517,11 @@ class CompanionViewModel @Inject constructor(
                         unlocked = _state.value.unlocked + contactId,
                         notice = null,
                     )
+                    // v1.5.8: consume once — a stale continuation must never
+                    // surprise a LATER unlock (same discipline as the v1.2.0
+                    // pendingText fix in ToolsViewModel).
                     afterUnlock?.invoke()
+                    afterUnlock = null
                 }
                 UnlockOutcome.NoSession -> {
                     _state.value = _state.value.copy(

@@ -107,11 +107,26 @@ fun ContactsScreen(viewModel: ContactsViewModel, biometrics: BiometricKeyStore) 
         floatingActionButton = {
             // v0.5: a real extended FAB (icon + label) — the v0.3–v0.4
             // pseudo-FAB was a bare TextButton that read as a list action.
+            // v1.5.8 (user report: "the add-contact button sits UNDER the
+            // floating menu and is not properly visible"): the FAB docked
+            // at the raw screen foot — Scaffold only reserves
+            // navigation-bar insets for it, and the floating glass bar
+            // (12dp stand-off + ~64dp pane + 6dp inner padding) floats
+            // OVER that same foot as an overlay, not as a Scaffold bar —
+            // so the FAB rendered beneath the pane, effectively hidden.
+            // It now carries the bar's own stand-off height as bottom
+            // padding, placing it flush ABOVE the pane exactly as the
+            // list's trailing spacer (96dp, v1.5.6) already clears it —
+            // same RTL-safe end-anchored docking, just visibly clear of
+            // the glass. No other screen has a FAB, so nothing else
+            // moves.
             ExtendedFloatingActionButton(
                 text = { Text(stringResource(R.string.contacts_add_contact)) },
                 icon = { Icon(TurnyptIcons.Add, contentDescription = null) },
                 onClick = { showAddDialog = true },
-                modifier = Modifier.padding(end = 12.dp, bottom = 12.dp),
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .padding(bottom = 96.dp),
             )
         },
     ) { padding ->

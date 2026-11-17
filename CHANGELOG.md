@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.8] - 2026-11-17 — two user-reported bugs (prerelease)
+
+### Bug 1: the add-contact button sat UNDER the floating menu
+
+User report, Contacts tab: the "add contact" button was effectively
+invisible — it docked at the raw screen foot, directly beneath the
+floating glass navigation bar that overlays that same foot. Scaffold
+only reserves navigation-bar insets for a FAB; the glass bar is not a
+Scaffold bar but an overlay, so nothing reserved its height. The FAB
+now carries the bar's stand-off as bottom padding (96dp — the same
+clearance the list's trailing spacer has used since 1.5.6), placing it
+flush above the pane, end-anchored and RTL-safe. No other screen has a
+FAB; nothing else moved.
+
+### Bug 2: decrypt-from-selection-menu never unlocked the contact
+
+User report: selecting a message in another app and choosing
+"Decrypt (Turnypt)" opened the sheet, but neither the passphrase nor
+the fingerprint ever opened the contact's lock — while encryption
+worked fine. Root cause was twofold in the companion decrypt flow:
+
+1. **The fingerprint path never armed the continuation.** Only the
+   passphrase path (unlockThen) stashed `afterUnlock` — the work that
+   NeedsUnlock interrupted (re-decrypt the envelope). The prompt
+   succeeded, the session key activated… and nothing re-ran: the sheet
+   sat on the unlock card forever. requestBiometricUnlock now arms the
+   same continuation, derived from the phase on screen, and it is
+   consumed once after a successful unlock.
+2. **The session resync clobbered the just-written unlock.** The
+   unlock's own sessionChanges bump fired resyncSessionState, which
+   recomputed `unlocked` over the DECRYPT flow's empty contacts list
+   (only the encrypt flow ever loads it) and wiped the entry the
+   unlock had just written — the sheet flipped back to "locked" the
+   moment it opened, retracting the fingerprint offer with it. The
+   resync now keeps the pending contact's live state honest instead.
+
+Four regression tests now drive the real CompanionViewModel through
+the real crypto stack (CompanionDecryptUnlockTest): passphrase
+continuation, fingerprint continuation, lockAll retraction mid-sheet,
+and the wrong-passphrase failure surface. Full matrix: 387 tests, 0
+failures.
+
 ## [1.5.7] - 2026-11-17 — one motion clock (prerelease)
 
 ### The app feels laggy; the bottom navigation is too fast and jumpy
