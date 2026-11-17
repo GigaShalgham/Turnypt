@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-11-17 — the shortcut fingerprint & the last band (prerelease)
+
+### Fingerprint on the shortcut-opened decrypt sheet
+
+The fingerprint offer, prompt and unlock logic are shared by every
+surface — the in-app tools, the contact dialog and the companion sheets
+— and unit tests prove the offer is armed on the shortcut path too. The
+remaining difference is the WINDOW the prompt must render on: the
+companion sheets are translucent, noHistory, empty-taskAffinity windows
+floating OVER ANOTHER APP — precisely the hosting conditions the
+androidx.biometric 1.2.0-alpha05 line (Sept 2022, pre-API-33 dialog
+fragment) handles worst: the system prompt silently fails to appear on
+those windows on several OEM builds. The library is upgraded to the
+current 1.4.0-beta01 (Nov 2026) line, whose FingerprintDialogFragment
+lifecycle/dismissal/non-activity-hosting rework is exactly this class
+of fix. (developer.android.com release notes; the 1.2.0 line never had
+a stable release.)
+
+The helper's silent dead path is now honest too: when the wrap blob
+cannot yield a cipher (blob too short / Keystore unavailable — the
+prompt can never be built), it reports a localized reason instead of
+a bare null that rendered as a plain user cancel.
+
+### The black/white band between the glass menu and the texts
+
+Three independent contributors, all removed:
+
+- The backdrop spent its whole LOWER half on one flat colour — a raw
+  plum-black page (dark) / raw white page (light). A backdrop is ambient
+  light, not a painted wall: a violet bloom now rises from the foot of
+  the field (stops at 62%/86%/100%), tuned to be felt as depth, never
+  seen as a stripe. The bar's region becomes lit atmosphere instead of
+  a separate flat sheet.
+- Theme.Material's solid windowBackground flashed as a raw black/white
+  sheet behind the glass during cold start before glassBackdrop painted.
+  The window now starts transparent and is covered by the first content
+  frame.
+- Android 14+ paints a translucent contrast scrim over the navigation
+  bar area unless opted out — on the dark theme it read as the flat
+  black strip under the bar. enforceNavigationBarContrast and
+  enforceStatusBarContrast are now false.
+
+versionCode 27 / versionName 1.5.4. Full matrix 496 tests green.
+
 ## [1.5.3] - 2026-11-17 — three root-cause fixes (prerelease)
 
 The v1.5.2 follow-up: each of the three repeat reports is fixed at its

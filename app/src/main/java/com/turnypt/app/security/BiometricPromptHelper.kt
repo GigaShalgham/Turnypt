@@ -66,7 +66,11 @@ class BiometricPromptHelper(
             // Blob too short or Keystore unavailable: the entry can never
             // open again — discard it so the UI stops offering it.
             store.clear(contactKey)
-            onResult(null, null)
+            // v1.5.4: report the honest reason instead of a bare null
+            // (which rendered as a plain user cancel): the wrap is gone
+            // or the Keystore cannot open it — the user should know why
+            // the fingerprint offer will not return.
+            onResult(null, activity.getString(com.turnypt.app.R.string.biometric_reason_hw_unavailable))
             return
         }
         gateReason()?.let { reason ->

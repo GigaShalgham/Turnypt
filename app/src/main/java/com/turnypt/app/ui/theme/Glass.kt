@@ -51,6 +51,14 @@ data class GlassColors(
     /** The quiet backdrop the glass samples (light: frost, dark: night). */
     val backdropTop: Color,
     val backdropBottom: Color,
+    /**
+     * v1.5.4: the violet ambient bloom rising from the foot of the
+     * backdrop — the lit atmosphere under the floating bar, replacing the
+     * flat black/white field that read as an extra sheet.
+     */
+    val backdropBloom: Color,
+    /** v1.5.4: the bloom's warmest point, right at the screen's foot. */
+    val backdropBloomStrong: Color,
     /** v1.5.0: the soft ambient shadow the glass casts (diffused, low). */
     val shadowColor: Color,
 )
@@ -71,6 +79,11 @@ val LightGlass = GlassColors(
     navTint = Color(0xB8FFFFFF),
     backdropTop = Color(0xFFEDE7F5),
     backdropBottom = Color(0xFFFAF8FD),
+    // v1.5.4 light bloom: the white field's foot warms with the same
+    // lilac the glass rims carry — the bar's region becomes lit
+    // atmosphere, not a raw white sheet.
+    backdropBloom = Color(0xFFF3EEF9),
+    backdropBloomStrong = Color(0xFFEFE8F6),
     shadowColor = Color(0x2E4A3B76),
 )
 
@@ -94,6 +107,13 @@ val DarkGlass = GlassColors(
     navTint = Color(0x59171522),
     backdropTop = Color(0xFF0E0C15),
     backdropBottom = Color(0xFF171522),
+    // v1.5.4 dark bloom: the plum-black field's foot lifts toward the
+    // primary violet — the region the bar floats in reads as ambient
+    // LIGHT, not a raw black page. The stops stay deep (221D33/2A2440
+    // territory) so OLED contrast is kept and the bloom is felt as
+    // depth, never seen as a stripe.
+    backdropBloom = Color(0xFF1C1828),
+    backdropBloomStrong = Color(0xFF221D33),
     shadowColor = Color(0x5C000000),
 )
 
@@ -179,11 +199,27 @@ private fun highlightBrushColor(glass: GlassColors, tint: Color): Color =
 /**
  * The quiet two-tone backdrop every screen sits on — the glass samples it
  * for depth. Applied once around the app content, never per-card.
+ *
+ * v1.5.4 (user report: "the black (or white, theme-dependent) page between
+ * the glass menu and the texts is STILL there, though smaller"): the old
+ * two-stop gradient spent the whole LOWER half of the screen on one flat
+ * colour — a raw plum-black page under the dark theme, a raw white page
+ * under the light one — and that flat field is what read as "an extra
+ * black/white sheet" sitting between the floating bar and the content.
+ * A backdrop is AMBIENT LIGHT, not a painted wall: a violet bloom now
+ * rises from the foot of the field (where the bar floats) and an even
+ * quieter one glows at the crown, so the region under the bar belongs to
+ * the same lit atmosphere the cards live in instead of forming its own
+ * flat band. The stops are tuned so the bloom is FELT as depth, never
+ * seen as a stripe.
  */
 fun Modifier.glassBackdrop(glass: GlassColors): Modifier =
     background(
         Brush.verticalGradient(
-            colors = listOf(glass.backdropTop, glass.backdropBottom),
+            0.00f to glass.backdropTop,
+            0.62f to glass.backdropBottom,
+            0.86f to glass.backdropBloom,
+            1.00f to glass.backdropBloomStrong,
         )
     )
 

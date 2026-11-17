@@ -1,9 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--
+      v1.5.4: the opaque themes no longer paint ANY window background of
+      their own. The old parent (Theme.Material.NoActionBar) shipped a
+      solid windowBackground that flashed as a raw black (or white,
+      theme-dependent) sheet behind the glass during cold start, before
+      the Compose glassBackdrop took over — one more contributor to the
+      reported "black/white page between the menu and the texts". The
+      app's real field is drawn by glassBackdrop; the window simply
+      starts transparent and is covered in the first frame of content.
+      statusBar/navigationBar stay transparent for edge-to-edge glass.
+    -->
     <style name="Theme.Turnypt" parent="android:Theme.Material.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <!--
+          v1.5.4: the system's own contrast scrim is a THIRD band source.
+          Android 14+ paints a translucent contrast scrim over the
+          navigation bar area of apps that do not opt out — on the dark
+          theme it read as the flat black strip under the glass bar. The
+          app draws its own bar with navigationBarsPadding; the system
+          scrim is explicitly disabled both places it can appear.
+        -->
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
     </style>
 
     <!--
@@ -13,7 +35,6 @@
     -->
     <style name="Theme.Turnypt.Companion" parent="Theme.Turnypt">
         <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:backgroundDimEnabled">true</item>
         <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
     </style>
