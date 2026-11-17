@@ -476,6 +476,11 @@ private fun ResultCard(
                 text = state.resultText ?: "",
                 fontSize = if (state.mode == CompanionMode.ENCRYPT) 12.sp else 15.sp,
                 fontFamily = if (state.mode == CompanionMode.ENCRYPT) FontFamily.Monospace else FontFamily.Default,
+                // v1.5.2 (user report: monospace envelopes read as raw
+                // black): the envelope carries the primary tone — it is
+                // the RESULT the user came for, tinted like every other
+                // value text, not default-black monospace.
+                color = MaterialTheme.colorScheme.primary,
                 maxLines = if (state.mode == CompanionMode.ENCRYPT) 6 else Int.MAX_VALUE,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier

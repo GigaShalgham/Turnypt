@@ -9,6 +9,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-17 — the extension ruling, motion & polish (prerelease)
+
+Five user rulings/fixes in one batch.
+
+### The custom-extension ruling — "once and for all"
+
+The v1.3.2 "type your own suffix" design is retired. The setting is now
+a **pure toggle**, off by default:
+
+- **OFF (default):** Turnypt's own suffixes — `.tnpi` for encrypted
+  images, `.cki` for everything else, exactly as always.
+- **ON:** every newly encrypted file — image or not — is named with the
+  ONE unifying suffix **`.tnp`**. Only and only `.tnp`; no typed value,
+  no field, no save button, no per-type branching.
+
+Naming only, as ever: the CKF1 magic (not the name) decides what a file
+is, decryption never depends on the suffix, and every file written under
+any suffix — `.tnp`, `.tnpi`, `.cki`, or a legacy custom one — keeps
+opening. A legacy stored suffix (v1.3.2–v1.5.1) is superseded by `tnp`
+at read time; the toggle wipes it on every flip.
+
+### Screen transitions & motion
+
+- The tab switch to Settings (every tab, in fact) previously cut
+  hard — now every route animates: the incoming screen fades in while
+  sliding up a short 10% distance; the outgoing fades out; the back
+  gesture mirrors it. Quarter-second tween, the app's calm tone kept.
+- The nav-slot icons settle with a soft spring (a little life, not the
+  previous dead snap) and cross-fade between selected/unselected tints;
+  the selection pill glides with a single restrained overshoot; the
+  quick-action tiles spring back on release with one soft overshoot.
+  All deferred state reads — the added motion costs no recomposition.
+
+### The bottom "purple chunk"
+
+The navigation bar's tint was near-opaque (0xD8 light / 0x8A dark), so
+the bar read as a dense solid slab at the screen's foot — visibly cut
+from different material than the backdrop behind it. The tint now
+carries the general glass weight (0xB8 / 0x66): the bar floats as glass
+over the two-tone backdrop, presence carried by the violet rim and the
+soft shadow instead of raw opacity.
+
+### Black-looking text
+
+Un-themed monospace blobs (suggested passphrases, result envelopes,
+invite codes) and the un-coloured contact-detail lines now carry theme
+roles: value/code texts get the primary tone (they are things you came
+for, not dead black monospace), captions get onSurfaceVariant. Contrast
+pairs unchanged (primary 7.08:1 on the dark field, 5.7:1 on light).
+
+### Passphrase suggestion — entry point only
+
+The strong-passphrase suggestion no longer appears in the add-contact
+(friend-code entry) dialog. It lives ONLY where the user is actually
+entering a passphrase: the unlock card and the shared-passphrase sheet
+(SuggestPassphraseSection, unchanged there).
+
+versionCode 25 / versionName 1.5.2. 496 unit tests green (494 + 2 new
+for the tnp ruling).
+
 ## [1.5.1] - 2026-11-17 — three visual corrections (prerelease)
 
 The follow-up batch to the Turnip identity: three user-reported visual

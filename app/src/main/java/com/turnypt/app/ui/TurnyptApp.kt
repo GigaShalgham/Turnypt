@@ -3,6 +3,11 @@ package com.turnypt.app.ui
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -100,6 +105,39 @@ fun TurnyptApp() {
         NavHost(
             navController = navController,
             startDestination = DestinationRoute.HOME,
+            // v1.5.2 (user report: "the bottom menu flies to the Settings
+            // page with NO animation"): every tab change — Settings
+            // included — now transitions. One deliberate motion, not a
+            // circus: the incoming screen fades in while sliding up a
+            // short 10% distance, the outgoing fades out — quarter-second
+            // tween, the app's calm tone kept. Pop (back) mirrors it so
+            // the back gesture feels the same in reverse.
+            enterTransition = {
+                fadeIn(
+                    animationSpec = tween(durationMillis = 250),
+                ) + slideInVertically(
+                    animationSpec = tween(durationMillis = 250),
+                    initialOffsetY = { it / 10 },
+                )
+            },
+            exitTransition = {
+                fadeOut(
+                    animationSpec = tween(durationMillis = 180),
+                )
+            },
+            popEnterTransition = {
+                fadeIn(
+                    animationSpec = tween(durationMillis = 250),
+                )
+            },
+            popExitTransition = {
+                fadeOut(
+                    animationSpec = tween(durationMillis = 180),
+                ) + slideOutVertically(
+                    animationSpec = tween(durationMillis = 180),
+                    targetOffsetY = { it / 10 },
+                )
+            },
             modifier = Modifier
                 .fillMaxSize()
                 // Room for the floating bar: the host insets its content
@@ -169,6 +207,14 @@ fun TurnyptApp() {
         // WindowInsets — edge-to-edge is enforced at targetSdk 36, so the
         // bar must inset itself above the gesture pill / 3-button strip
         // on every device, with no hardcoded per-device offsets.
+        // v1.5.2 (user report: "a solid purple chunk at the bottom of
+        // the app looks ugly"): the navTint layer was nearly opaque
+        // (0xD8/0x8A alpha), so the bar read as a dense purple SLAB
+        // floating over a quieter backdrop — a visibly different chunk
+        // at the screen's foot. Glass harmonizes with what it floats
+        // over: the tint is lifted to match the general glass weight,
+        // letting the two-tone backdrop and the soft shadow carry the
+        // pane's presence instead of raw opacity.
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -316,13 +362,24 @@ private fun NavBarSlot(
     // The active icon settles a hair larger — quiet emphasis. v1.5.0 perf:
     // no-bouncy spring, and the scale is read only inside the
     // graphicsLayer lambda — the animation never recomposes the slot.
+    // v1.5.2 (user report: "the app feels static — add animation
+    // everywhere"): the spring now carries a LITTLE life —
+    // MediumBouncy, not NoBouncy — a single soft settle, still quiet,
+    // still cheap (same deferred-read structure). The selected color
+    // also cross-fades so the tint change reads as motion, not a blink.
     val iconScale = animateFloatAsState(
-        targetValue = if (selected) 1.06f else 1f,
+        targetValue = if (selected) 1.12f else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow,
             visibilityThreshold = 0.01f,
         ),
         label = "navIconScale",
+    )
+    val iconAlpha = animateFloatAsState(
+        targetValue = if (selected) 1f else 0.72f,
+        animationSpec = tween(durationMillis = 200),
+        label = "navIconAlpha",
     )
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -345,6 +402,7 @@ private fun NavBarSlot(
                 .graphicsLayer {
                     scaleX = iconScale.value
                     scaleY = iconScale.value
+                    alpha = iconAlpha.value
                 },
         )
         Text(

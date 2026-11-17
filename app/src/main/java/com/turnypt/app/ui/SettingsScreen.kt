@@ -20,7 +20,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,7 +49,6 @@ import com.turnypt.app.security.BiometricGate
 import com.turnypt.app.companion.UiNotice
 import com.turnypt.core.crypto.CipherAlgorithm
 import com.turnypt.data.preferences.CipherPreference
-import com.turnypt.data.preferences.CustomFileExtension
 import com.turnypt.app.ui.theme.GlassRadii
 import com.turnypt.app.ui.theme.LocalGlassTokens
 import com.turnypt.app.ui.theme.glassSurface
@@ -86,10 +84,9 @@ fun SettingsScreen(
     }
 
     // One-shot events: open the overlay-permission screen when the
-    // assistant was enabled but the permission is missing; surface the
-    // custom-extension needs-value/invalid states as the row's error banner
-    // (v1.3.2 — an honest error instead of a silent no-op).
-    var customExtErrorRes by remember { mutableStateOf<Int?>(null) }
+    // assistant was enabled but the permission is missing.
+    // (v1.5.2: the custom-extension needs-value/invalid events are gone
+    // with the suffix field — the setting is now a pure toggle.)
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->
             when (event) {
@@ -101,10 +98,6 @@ fun SettingsScreen(
                         ),
                     )
                 }
-                SettingsEvent.CustomFileExtensionNeedsValue ->
-                    customExtErrorRes = R.string.settings_custom_ext_needs_value
-                SettingsEvent.CustomFileExtensionInvalid ->
-                    customExtErrorRes = R.string.settings_custom_ext_error
             }
         }
     }
@@ -197,16 +190,11 @@ fun SettingsScreen(
             }
 
             // --------------------------------- custom file extension (v1.3.2)
-            // Off by default: the ecosystem suffixes (.tnpi/.cki) stay the
-            // default experience. The row carries its own field, so typing
-            // and saving the suffix happen in one place; validation errors
-            // (local or event-driven from the VM) render as an error-toned
-            // banner right here instead of a silent no-op.
-
-            var customExtDraft by remember(settings.customFileExtension) {
-                mutableStateOf(settings.customFileExtension)
-            }
-            val customExtError = customExtErrorRes
+            // v1.5.2 (user ruling, "once and for all"): the custom
+            // extension is a PURE toggle — no typed value, no field, no
+            // save button. OFF (default) keeps the ecosystem suffixes
+            // (.tnpi images / .cki others); ON names EVERY newly
+            // encrypted file with the ONE unifying .tnp suffix.
             SettingSwitchRow(
                 title = stringResource(R.string.settings_custom_ext_title),
                 subtitle = stringResource(R.string.settings_custom_ext_summary),
@@ -214,38 +202,6 @@ fun SettingsScreen(
                 enabled = true,
                 onCheckedChange = viewModel::setCustomFileExtensionEnabled,
             )
-            if (customExtError != null) {
-                NoticeBanner(UiNotice(customExtError), NoticeTone.ERROR)
-            }
-            OutlinedTextField(
-                value = customExtDraft,
-                onValueChange = { value ->
-                    customExtDraft = value
-                    // Typing clears the error on both paths.
-                    customExtErrorRes = null
-                },
-                singleLine = true,
-                label = { Text(stringResource(R.string.settings_custom_ext_field_label)) },
-                supportingText = {
-                    Text(stringResource(R.string.settings_custom_ext_field_support))
-                },
-                isError = customExtError != null,
-                enabled = !settings.customFileExtensionEnabled,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            TextButton(
-                onClick = {
-                    if (CustomFileExtension.sanitize(customExtDraft) == null) {
-                        customExtErrorRes = R.string.settings_custom_ext_error
-                    } else {
-                        customExtErrorRes = null
-                        viewModel.setCustomFileExtension(customExtDraft)
-                    }
-                },
-                // Editing the suffix only makes sense while OFF — enabling
-                // requires a stored value, and a live one is not edited.
-                enabled = customExtDraft.isNotBlank() && !settings.customFileExtensionEnabled,
-            ) { Text(stringResource(R.string.settings_custom_ext_save)) }
         }
 
         // ------------------------------------------------ session & security

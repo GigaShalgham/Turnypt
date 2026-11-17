@@ -393,14 +393,15 @@ class ToolsViewModel @Inject constructor(
 
     /**
      * v1.3.2: the effective custom file-extension suffix for NEW encrypted
-     * names, resolved from the live settings — null when the setting is OFF
-     * (or no valid suffix is stored), which keeps every default path
-     * (.tnpi/.cki) exactly as before.
+     * names, resolved from the live settings — null when the setting is OFF,
+     * which keeps every default path (.tnpi/.cki) exactly as before.
+     *
+     * v1.5.2 (user ruling): the setting is a pure toggle — ON resolves to
+     * the unifying "tnp" suffix for EVERY new encrypted file (images and
+     * others alike); there is no user-entered value to be blank.
      */
-    private suspend fun customFileSuffix(): String? {
-        val s = settings.settings.first()
-        return if (s.customFileExtensionEnabled) s.customFileExtension.takeIf { it.isNotBlank() } else null
-    }
+    private suspend fun customFileSuffix(): String? =
+        settings.settings.first().effectiveCustomSuffix
 
     /**
      * Streams the picked image into [outputUri] (the SAF CreateDocument

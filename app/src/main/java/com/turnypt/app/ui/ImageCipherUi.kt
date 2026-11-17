@@ -104,13 +104,17 @@ fun ToolSegmentRow(
     val glass = LocalGlassTokens.current
     val shape = RoundedCornerShape(GlassRadii.pill)
     // The indicator slides between the two halves of the track. v1.5.0
-    // perf: critically damped (no overshoot), and the animated value is
-    // read only inside the offset lambda (deferred read) — the animation
-    // repaints one layer, it never recomposes the options.
+    // perf: the animated value is read only inside the offset lambda
+    // (deferred read) — the animation repaints one layer, it never
+    // recomposes the options.
+    // v1.5.2 (user report: "add animation everywhere"): the spring now
+    // carries a little settle (MediumBouncy) — the pill glides and lands
+    // with a single soft overshoot, still quiet, still one layer.
     val indicatorFraction = animateFloatAsState(
         targetValue = if (imageSelected) 1f else 0f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow,
             visibilityThreshold = 0.01f,
         ),
         label = "segmentIndicator",

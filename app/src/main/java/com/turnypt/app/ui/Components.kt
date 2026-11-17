@@ -197,12 +197,15 @@ fun QuickActionTile(
 ) {
     val glass = LocalGlassTokens.current
     var pressed by remember { mutableStateOf(false) }
-    // v1.5.0 perf: no-bouncy spring + deferred read — the press scale
-    // repaints one layer; the tile content never recomposes.
+    // v1.5.0 perf: deferred read — the press scale repaints one layer;
+    // the tile content never recomposes. v1.5.2 (user report: "add
+    // animation everywhere"): a little settle on release — the tile
+    // springs back with one soft overshoot instead of snapping flat.
     val scale = animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
+        targetValue = if (pressed) 0.96f else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium,
             visibilityThreshold = 0.01f,
         ),
         label = "tilePress",
@@ -455,6 +458,11 @@ fun SuggestPassphraseSection(
                 suggestion,
                 fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.bodyMedium,
+                // v1.5.2 (user report: monospace blobs read as raw black):
+                // the suggested passphrase carries the primary tone — a
+                // value the user is meant to notice and use, tinted like
+                // the invite codes, not default-black monospace.
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

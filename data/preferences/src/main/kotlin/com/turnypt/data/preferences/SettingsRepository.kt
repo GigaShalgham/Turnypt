@@ -42,15 +42,23 @@ enum class CipherPreference {
 }
 
 /**
- * v1.3.2: the user's custom extension for encrypted files, applied when the
- * "custom file extension" setting is ON. Purely a NAMING preference: the
- * file's content (the CKF1 magic) decides what it is, decryption never
- * depends on the name, and every file ever written under .tnpi/.cki keeps
- * opening exactly as before.
+ * v1.5.2 (user ruling, "once and for all"): the custom file-extension
+ * setting is a SINGLE toggle — "پسوند کاستوم". OFF (the default) keeps
+ * Turnypt's ecosystem suffixes (.tnpi images / .cki others). ON names
+ * EVERY newly encrypted file with the ONE unifying suffix: .TNP —
+ * images AND text/other files alike, no exceptions, no per-type
+ * branching, no user-entered suffix value.
+ *
+ * Purely a NAMING preference: the file's content (the CKF1 magic) decides
+ * what it is, decryption never depends on the name, and every file ever
+ * written under .tnpi/.cki keeps opening exactly as before.
  */
 object CustomFileExtension {
 
-    /** Shortest sane suffix ("x"); "tnpi"-length names fit comfortably. */
+    /** v1.5.2: the ONE suffix the toggle applies — ".tnp", every file. */
+    const val UNIFYING_EXTENSION: String = "tnp"
+
+    /** Shortest sane suffix ("x"); kept for legacy-value sanitization. */
     const val MIN_LENGTH: Int = 1
 
     /** Longest sane suffix — a filename, not a sentence. */
@@ -68,6 +76,10 @@ object CustomFileExtension {
      * a filename suffix must round-trip through every filesystem and SAF
      * provider without surprises. Reserved Turnypt suffixes are refused so
      * a custom value can never masquerade as the defaults.
+     *
+     * v1.5.2: kept only to re-validate any value persisted by the v1.3.2–
+     * v1.5.1 "type your own suffix" UI on read (see [SettingsRepository]);
+     * the setting no longer accepts user input.
      */
     fun sanitize(raw: String): String? {
         val trimmed = raw.trim().removePrefix(".").trim()
@@ -101,11 +113,32 @@ data class AppSettings(
      * v1.3.2: name NEW encrypted files with the user's custom suffix
      * instead of Turnypt's (.tnpi images / .cki others). OFF by default —
      * the ecosystem suffixes stay the default experience.
+     *
+     * v1.5.2 (user ruling): the suffix is no longer user-entered — ON
+     * names EVERY new encrypted file with the unifying .tnp suffix
+     * ([CustomFileExtension.UNIFYING_EXTENSION]), images and others
+     * alike. The stored-value field is kept only so a value persisted by
+     * the v1.3.2–v1.5.1 UI migrates cleanly: any old value is simply
+     * superseded by tnp wherever the toggle is read.
      */
     val customFileExtensionEnabled: Boolean = false,
-    /** v1.3.2: the sanitized suffix applied when the toggle is ON ("secret"). */
+    /**
+     * v1.3.2 legacy: the sanitized suffix applied when the toggle is ON.
+     * v1.5.2: informational only — consumers resolve the effective suffix
+     * through [effectiveCustomSuffix], which is always
+     * [CustomFileExtension.UNIFYING_EXTENSION] when enabled.
+     */
     val customFileExtension: String = "",
-)
+) {
+    /**
+     * v1.5.2: the ONE effective custom suffix when the toggle is ON —
+     * always "tnp", whatever legacy value may be stored. When OFF there
+     * is no custom suffix at all (null), and the ecosystem defaults
+     * (.tnpi / .cki) apply.
+     */
+    val effectiveCustomSuffix: String?
+        get() = if (customFileExtensionEnabled) CustomFileExtension.UNIFYING_EXTENSION else null
+}
 
 class SettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -182,14 +215,18 @@ class SettingsRepository(
     }
 
     /**
-     * v1.3.2: toggles the custom file-extension naming. OFF also blanks the
-     * stored suffix so a later re-enable starts from a clean slate rather
-     * than resurrecting a forgotten value — "off" must mean off.
+     * v1.3.2: toggles the custom file-extension naming.
+     *
+     * v1.5.2 (user ruling): a SINGLE toggle with no companion value —
+     * ON means every new encrypted file is named with the unifying .tnp
+     * suffix. Any legacy stored suffix (v1.3.2–v1.5.1 UIs) is wiped on
+     * every flip so "off" means off and "on" means tnp, never a
+     * resurrected old value.
      */
     suspend fun setCustomFileExtensionEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_CUSTOM_EXT_ENABLED] = enabled
-            if (!enabled) prefs.remove(KEY_CUSTOM_EXT)
+            prefs.remove(KEY_CUSTOM_EXT)
         }
     }
 
@@ -197,7 +234,15 @@ class SettingsRepository(
      * v1.3.2: stores the custom suffix (sanitized; rejected input throws
      * [IllegalArgumentException] so the Settings row can show the honest
      * error instead of silently keeping the old value).
+     *
+     * v1.5.2: no longer called by any UI — the setting has no
+     * user-entered value any more. Kept (deprecated) so external callers
+     * compile and behave honestly: a stored value is superseded by tnp
+     * at read time (see [AppSettings.effectiveCustomSuffix]).
+     *
+     * @deprecated the v1.5.2 setting is a pure toggle.
      */
+    @Deprecated("The setting is a single toggle; .tnp is applied automatically.")
     suspend fun setCustomFileExtension(raw: String) {
         val sanitized = CustomFileExtension.sanitize(raw)
             ?: throw IllegalArgumentException("invalid file extension: $raw")

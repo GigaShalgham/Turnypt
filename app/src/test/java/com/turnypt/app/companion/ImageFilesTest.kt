@@ -1,5 +1,6 @@
 package com.turnypt.app.companion
 
+import com.turnypt.data.preferences.AppSettings
 import com.turnypt.data.preferences.CustomFileExtension
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -205,20 +206,22 @@ class ImageFilesTest {
 
     @Test
     fun `custom suffix replaces the ecosystem suffix everywhere`() {
-        assertEquals("photo.jpg.secret", ImageFiles.suggestedEncryptedName("photo.jpg", customExtension = "secret"))
-        assertEquals("notes.txt.secret", ImageFiles.suggestedEncryptedName("notes.txt", customExtension = "secret"))
-        assertEquals("image.secret", ImageFiles.suggestedEncryptedName(null, customExtension = "secret"))
+        // v1.5.2: the toggle's ONE suffix is tnp — it replaces the
+        // ecosystem suffixes for images AND other files alike.
+        assertEquals("photo.jpg.tnp", ImageFiles.suggestedEncryptedName("photo.jpg", customExtension = "tnp"))
+        assertEquals("notes.txt.tnp", ImageFiles.suggestedEncryptedName("notes.txt", customExtension = "tnp"))
+        assertEquals("image.tnp", ImageFiles.suggestedEncryptedName(null, customExtension = "tnp"))
         // The image-extension derivation step is skipped for custom names:
         // a single custom suffix replaces the whole tnpi layer.
-        assertEquals("IMG_001.secret", ImageFiles.suggestedEncryptedName("IMG_001", "image/png", "secret"))
+        assertEquals("IMG_001.tnp", ImageFiles.suggestedEncryptedName("IMG_001", "image/png", "tnp"))
     }
 
     @Test
     fun `custom suffix never double-suffixes encrypted passthrough names`() {
         // Names already encrypted stay untouched — the user can re-encrypt
         // a copy of an existing .tnpi without mangling it.
-        assertEquals("photo.jpg.tnpi", ImageFiles.suggestedEncryptedName("photo.jpg.tnpi", customExtension = "secret"))
-        assertEquals("photo.jpg.cki", ImageFiles.suggestedEncryptedName("photo.jpg.cki", customExtension = "secret"))
+        assertEquals("photo.jpg.tnpi", ImageFiles.suggestedEncryptedName("photo.jpg.tnpi", customExtension = "tnp"))
+        assertEquals("photo.jpg.cki", ImageFiles.suggestedEncryptedName("photo.jpg.cki", customExtension = "tnp"))
     }
 
     @Test
@@ -230,14 +233,34 @@ class ImageFilesTest {
 
     @Test
     fun `original names strip the custom suffix too`() {
-        assertEquals("photo.jpg", ImageFiles.suggestedOriginalName("photo.jpg.secret", "secret"))
-        assertEquals("notes", ImageFiles.suggestedOriginalName("notes.secret", "secret"))
-        assertEquals("photo.jpg", ImageFiles.suggestedPlaintextName("photo.jpg.secret", null, "secret"))
+        assertEquals("photo.jpg", ImageFiles.suggestedOriginalName("photo.jpg.tnp", "tnp"))
+        assertEquals("notes", ImageFiles.suggestedOriginalName("notes.tnp", "tnp"))
+        assertEquals("photo.jpg", ImageFiles.suggestedPlaintextName("photo.jpg.tnp", null, "tnp"))
         // A custom-suffixed output with no remaining extension still gets
         // its extension from the sniffed plaintext.
-        assertEquals("photo.jpg", ImageFiles.suggestedPlaintextName("photo.secret", "image/jpeg", "secret"))
+        assertEquals("photo.jpg", ImageFiles.suggestedPlaintextName("photo.tnp", "image/jpeg", "tnp"))
         // Without the custom suffix supplied, a custom-named file passes
         // through unchanged (same as any unknown suffix always has).
-        assertEquals("photo.jpg.secret", ImageFiles.suggestedOriginalName("photo.jpg.secret"))
+        assertEquals("photo.jpg.tnp", ImageFiles.suggestedOriginalName("photo.jpg.tnp"))
+    }
+
+    // ------------------------------------------- v1.5.2: the toggle resolves to tnp
+
+    @Test
+    fun `effective custom suffix is tnp when enabled and null when off`() {
+        // The setting is a PURE toggle now: ON always resolves to the
+        // unifying tnp suffix — a legacy stored value (v1.3.2–v1.5.1 UIs)
+        // is superseded, never resurrected.
+        assertEquals("tnp", CustomFileExtension.UNIFYING_EXTENSION)
+        val on = AppSettings(customFileExtensionEnabled = true, customFileExtension = "secret")
+        assertEquals("tnp", on.effectiveCustomSuffix)
+        val onLegacyBlank = AppSettings(customFileExtensionEnabled = true, customFileExtension = "")
+        assertEquals("tnp", onLegacyBlank.effectiveCustomSuffix)
+        val off = AppSettings(customFileExtensionEnabled = false, customFileExtension = "secret")
+        assertNull(off.effectiveCustomSuffix)
+        val offDefault = AppSettings()
+        assertNull(offDefault.effectiveCustomSuffix)
+        // OFF is the default (out of the box the ecosystem suffixes apply).
+        assertFalse(offDefault.customFileExtensionEnabled)
     }
 }

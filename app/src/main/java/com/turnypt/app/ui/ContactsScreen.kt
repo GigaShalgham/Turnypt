@@ -330,15 +330,19 @@ private fun AddContactDialog(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    // v0.5.2: no friend invite entered → THIS side picks the
-                    // shared passphrase, so the suggestion is offered (user
-                    // report); with an invite, the peer already picked it.
-                    OptionalPassphraseSuggestion(onCopy = onCopyPassphrase)
+                    // v1.5.2 (user ruling): no strong-passphrase suggestion
+                    // here any more — the friend-code entry is not a
+                    // passphrase-entry point. When THIS side later unlocks
+                    // the era (or opens the shared-passphrase sheet), the
+                    // entry-point suggestion (SuggestPassphraseSection)
+                    // is right there. (v0.5.2's OptionalPassphraseSuggestion
+                    // was removed with the same ruling.)
                 }
                 Text(
                     stringResource(R.string.contact_argon2_title),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Argon2Profile.entries.forEach { candidate ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -386,47 +390,13 @@ private fun AddContactDialog(
  * it never auto-shows (v0.4.0 did, which read as a compulsory,
  * system-assigned password and, taken at face value on two phones, would
  * give each side a DIFFERENT passphrase).
+ *
+ * v1.5.2 (user ruling): RETIRED — this suggestion lived in the
+ * ADD-CONTACT dialog, right under the friend-code field. The strong
+ * passphrase suggestion now appears ONLY at the passphrase-entry point
+ * (SuggestPassphraseSection in Components.kt, shown at the unlock card
+ * and the shared-passphrase sheet) — removed from here entirely.
  */
-@Composable
-private fun OptionalPassphraseSuggestion(onCopy: (String) -> Boolean) {
-    var visible by remember { mutableStateOf(false) }
-    if (!visible) {
-        TextButton(onClick = { visible = true }) {
-            Text(stringResource(R.string.contact_suggest_passphrase))
-        }
-        return
-    }
-    var suggestion by remember { mutableStateOf(PassphraseAdvisor.recommend()) }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            suggestion,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 14.sp,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            stringResource(R.string.contact_suggestion_bits, PassphraseAdvisor.GUARANTEED_BITS),
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { suggestion = PassphraseAdvisor.recommend() }) {
-                Text(stringResource(R.string.contact_suggestion_new))
-            }
-            TextButton(onClick = { onCopy(suggestion) }) {
-                Text(stringResource(R.string.action_copy))
-            }
-            TextButton(onClick = { visible = false }) {
-                Text(stringResource(R.string.contact_suggest_hide))
-            }
-        }
-        Text(
-            stringResource(R.string.contact_suggestion_warning),
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
 
 @Composable
 private fun ContactDetailDialog(
@@ -561,6 +531,7 @@ private fun ContactDetailDialog(
                         Text(
                             stringResource(R.string.contact_key_fingerprint, it),
                             fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -574,11 +545,17 @@ private fun ContactDetailDialog(
                         stringResource(R.string.contact_invite_section),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     SelectionContainer {
                         Text(
                             latestEra.inviteCode,
                             fontSize = 11.sp,
+                            // v1.5.2 (user report: dark monospace blobs read
+                            // as raw black): the invite code carries the
+                            // primary tone — a brand-purple code chip reads
+                            // as a selectable VALUE, not dead black text.
+                            color = MaterialTheme.colorScheme.primary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -619,13 +596,18 @@ private fun ContactDetailDialog(
                         )
                     }
                 } else {
-                    Text(stringResource(R.string.contact_no_era), fontSize = 13.sp)
+                    Text(
+                        stringResource(R.string.contact_no_era),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
 
                 if (eras.size > 1) {
                     Text(
                         stringResource(R.string.contact_older_eras, eras.size - 1),
                         fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 

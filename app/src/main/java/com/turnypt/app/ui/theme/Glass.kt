@@ -58,11 +58,14 @@ data class GlassColors(
 val LightGlass = GlassColors(
     // v1.5.0 Turnip: white-violet glass on the warm-white field — purple
     // ambient light without saturation; the rim is a violet hairline.
+    // v1.5.2: navTint lifted from near-opaque (0xD8) to the general
+    // glass weight (0xB8) — the bar floats as glass over the backdrop,
+    // not as a solid white-violet slab at the screen's foot.
     tint = Color(0xB8FFFFFF),
     tintHigh = Color(0xE8F0EAF9),
     border = Color(0x478256C7),
     highlight = Color(0x5CE8DDF9),
-    navTint = Color(0xD8FFFFFF),
+    navTint = Color(0xB8FFFFFF),
     backdropTop = Color(0xFFEDE7F5),
     backdropBottom = Color(0xFFFAF8FD),
     shadowColor = Color(0x2E4A3B76),
@@ -71,11 +74,16 @@ val LightGlass = GlassColors(
 val DarkGlass = GlassColors(
     // v1.5.0 Turnip: plum-smoke glass over the plum-black field; the rim
     // is violet (not white) so the edge reads as light, not chalk.
+    // v1.5.2: navTint lifted from heavy (0x8A) to the general glass
+    // weight (0x66) — the bar harmonizes with the backdrop it floats
+    // over; presence comes from the violet rim and the soft shadow,
+    // not raw opacity. (User report: the bar read as "a solid purple
+    // chunk" cut from different material than the screen behind it.)
     tint = Color(0x66221D33),
     tintHigh = Color(0x992A2440),
     border = Color(0x47B18AFB),
     highlight = Color(0x33B18AFB),
-    navTint = Color(0x8A1F1B31),
+    navTint = Color(0x66221D33),
     backdropTop = Color(0xFF0E0C15),
     backdropBottom = Color(0xFF171522),
     shadowColor = Color(0x5C000000),
