@@ -6,6 +6,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,8 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,7 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -199,16 +198,32 @@ fun QuickActionTile(
     onClick: () -> Unit,
 ) {
     val glass = LocalGlassTokens.current
-    var pressed by remember { mutableStateOf(false) }
+    // v1.5.7 perf: pressed-state tracking runs on the ONE gesture
+    // pipeline. The tile previously wired BOTH clickable's
+    // interactionSource AND a private pointerInput/awaitEachGesture
+    // coroutine per tile — two hit-test pipelines for every tile on
+    // Home, and the raw-pointer path could race the clickable one
+    // (double press flips, stuck 0.96 scale on cancellation edge
+    // cases). clickable already reports presses through its
+    // interactionSource; collectIsPressedAsState() is the built-in
+    // observer for exactly that. One pipeline, zero custom coroutines,
+    // the same deferred-read scale animation.
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     // v1.5.0 perf: deferred read — the press scale repaints one layer;
     // the tile content never recomposes. v1.5.2 (user report: "add
     // animation everywhere"): a little settle on release — the tile
     // springs back with one soft overshoot instead of snapping flat.
+    // v1.5.7 (user report: "the app feels laggy"): the release settle
+    // ran at StiffnessMedium — a ~400ms tail on a 96%-scale press, a
+    // lingering shimmer after every tap. Re-tuned to the app's shared
+    // ~280ms beat (stiffness 1200) so the glass settles WITH the tap
+    // instead of dragging after it; same soft-overshoot character.
     val scale = animateFloatAsState(
         targetValue = if (pressed) 0.96f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
+            stiffness = 1200f,
             visibilityThreshold = 0.01f,
         ),
         label = "tilePress",
@@ -224,18 +239,11 @@ fun QuickActionTile(
             }
             .glassSurface(glass, shape)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled,
                 onClick = onClick,
-            )
-            .pointerInput(enabled) {
-                awaitEachGesture {
-                    pressed = true
-                    waitForUpOrCancellation()
-                    pressed = false
-                }
-            },
+            ),
         // v1.5.5 (user report: "the values in each button on the Home
         // screen are not in the button's centre"): a Box without
         // contentAlignment pins its child to the top-start corner, so the

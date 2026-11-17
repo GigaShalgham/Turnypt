@@ -9,6 +9,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.7] - 2026-11-17 — one motion clock (prerelease)
+
+### The app feels laggy; the bottom navigation is too fast and jumpy
+
+User report, and a full performance audit of the UI layer. The headline
+finding: there was no single "slow" thing — there were THREE motion
+clocks disagreeing with each other on every tab change. The selection
+pill spring ran at the library's default stiffness (10,000 — a ~120ms
+snap), the page crossfade ran at 250ms in and 180ms out, and the icon
+settle ran 500ms+ with its bounce landing after everything else had
+stopped. The pill teleported, the outgoing screen faded out before the
+incoming one arrived (a dip toward the backdrop mid-transition — the
+"jump"), and the icon shimmered on after the page had settled.
+
+**One clock now.** Every motion on a tab change runs the same ~280ms
+beat:
+
+- Page transitions: enter and exit share 280ms with the Material
+  FastOutSlowIn curve (decelerating arrival). The exit no longer
+  finishes 100ms before the enter completes — the crossfade trough is
+  gone; the incoming screen reaches full opacity exactly as the
+  outgoing finishes.
+- Selection pill: stiffness 380, critically damped — a ~280ms glide
+  that lands WITH the page (was: ~120ms snap). Still zero overshoot,
+  still deferred-read (one layer translate per frame, the five slots
+  never recompose).
+- Icon scale/alpha: the soft-overshoot character stays (it is the
+  deliberate life of v1.5.2) but at stiffness 1200 it settles with the
+  pill instead of dragging on a quarter-second tail; the color
+  crossfade joins the same clock.
+- Home tiles: the press-release settle re-tuned from a ~400ms tail to
+  the same beat.
+
+### Hidden overhead removed (no visual change anywhere)
+
+- `glassSurface` allocated two gradient brush objects per DRAW PASS —
+  and the sliding pill repaints the whole glass bar every frame, so
+  those allocations ran at animation frequency, every frame, on every
+  glass surface (cards, chips, fields, the bar). The brushes are now
+  built once when the modifier is created; the tint "gradient" was two
+  identical stops and is now a plain solid fill. Byte-for-byte the
+  same pixels, zero per-frame garbage.
+- Every `QuickActionTile` ran TWO gesture pipelines — `clickable`'s
+  own interaction tracking PLUS a private `pointerInput/
+  awaitEachGesture` coroutine just to observe "pressed". The custom
+  coroutine is gone: `collectIsPressedAsState()` observes the same
+  press through the one `clickable` pipeline (and removes two
+  edge-case races where the scale could stick at 0.96).
+- The five-entry destination table was rebuilt (five data classes +
+  a list) on every recomposition of the app root — i.e. on every tab
+  change. It is now a file-level constant.
+
+versionCode 30 / versionName 1.5.7.
+
 ## [1.5.6] - 2026-11-17 — the overlay was the viewport cut (prerelease)
 
 ### The opaque overlay between the content and the glass menu

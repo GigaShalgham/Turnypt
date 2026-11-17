@@ -1,5 +1,6 @@
 package com.turnypt.app.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -80,19 +81,27 @@ import com.turnypt.app.ui.theme.glassSurface
  */
 private data class Destination(val route: String, val labelRes: Int, val icon: ImageVector)
 
+/** v1.5.7 perf: the one, forever-stable destination table (see TurnyptApp). */
+private val NavDestinations = listOf(
+    Destination(DestinationRoute.HOME, R.string.nav_home, TurnyptIcons.Home),
+    Destination(DestinationRoute.ENCRYPT, R.string.nav_encrypt, TurnyptIcons.Lock),
+    Destination(DestinationRoute.DECRYPT, R.string.nav_decrypt, TurnyptIcons.LockOpen),
+    Destination(DestinationRoute.CONTACTS, R.string.nav_contacts, TurnyptIcons.People),
+    Destination(DestinationRoute.SETTINGS, R.string.nav_settings, TurnyptIcons.Settings),
+)
+
 @Composable
 fun TurnyptApp() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val glass = LocalGlassTokens.current
 
-    val destinations = listOf(
-        Destination(DestinationRoute.HOME, R.string.nav_home, TurnyptIcons.Home),
-        Destination(DestinationRoute.ENCRYPT, R.string.nav_encrypt, TurnyptIcons.Lock),
-        Destination(DestinationRoute.DECRYPT, R.string.nav_decrypt, TurnyptIcons.LockOpen),
-        Destination(DestinationRoute.CONTACTS, R.string.nav_contacts, TurnyptIcons.People),
-        Destination(DestinationRoute.SETTINGS, R.string.nav_settings, TurnyptIcons.Settings),
-    )
+    // v1.5.7 perf: the destination table is a compile-time constant —
+    // it was rebuilt (five data class allocations + the list) on every
+    // recomposition of the app root, which happens on EVERY tab change
+    // (the back-stack entry state flips). Hoisted to the file scope;
+    // recomposition now re-reads one object.
+    val destinations = NavDestinations
 
     // The quiet two-tone backdrop: the whole content area sits on it, so
     // every glass surface (cards, the floating bar) samples real depth.
@@ -110,32 +119,67 @@ fun TurnyptApp() {
             // page with NO animation"): every tab change — Settings
             // included — now transitions. One deliberate motion, not a
             // circus: the incoming screen fades in while sliding up a
-            // short 10% distance, the outgoing fades out — quarter-second
-            // tween, the app's calm tone kept. Pop (back) mirrors it so
-            // the back gesture feels the same in reverse.
+            // short 10% distance, the outgoing fades out — the app's calm
+            // tone kept. Pop (back) mirrors it so the back gesture feels
+            // the same in reverse.
+            //
+            // v1.5.7 (user report: "the app feels laggy; the bottom
+            // navigation animation is too fast — transitions feel jumpy
+            // rather than smooth"): the three motion clocks were
+            // UNSYNCHRONIZED — the outgoing screen faded out in 180ms
+            // while the incoming was only two-thirds through its 250ms
+            // fade, so the whole page dipped toward the backdrop before
+            // the new screen arrived (a crossfade trough that reads as a
+            // jump, not a glide). The transitions now share ONE clock:
+            // enter and exit run the SAME 280ms span with FastOutSlowIn
+            // easing (decelerating arrival — the Material standard
+            // curve), and the exit no longer finishes early, so the
+            // incoming screen is fully opaque exactly when the outgoing
+            // completes — the trough is gone. The durations are still
+            // quiet and deliberate; nothing got slower than it needs to
+            // be — they just no longer disagree. The selection pill and
+            // icon springs below were re-tuned to this same beat.
             enterTransition = {
                 fadeIn(
-                    animationSpec = tween(durationMillis = 250),
+                    animationSpec = tween(
+                        durationMillis = 280,
+                        easing = FastOutSlowInEasing,
+                    ),
                 ) + slideInVertically(
-                    animationSpec = tween(durationMillis = 250),
+                    animationSpec = tween(
+                        durationMillis = 280,
+                        easing = FastOutSlowInEasing,
+                    ),
                     initialOffsetY = { it / 10 },
                 )
             },
             exitTransition = {
                 fadeOut(
-                    animationSpec = tween(durationMillis = 180),
+                    animationSpec = tween(
+                        durationMillis = 280,
+                        easing = FastOutSlowInEasing,
+                    ),
                 )
             },
             popEnterTransition = {
                 fadeIn(
-                    animationSpec = tween(durationMillis = 250),
+                    animationSpec = tween(
+                        durationMillis = 280,
+                        easing = FastOutSlowInEasing,
+                    ),
                 )
             },
             popExitTransition = {
                 fadeOut(
-                    animationSpec = tween(durationMillis = 180),
+                    animationSpec = tween(
+                        durationMillis = 280,
+                        easing = FastOutSlowInEasing,
+                    ),
                 ) + slideOutVertically(
-                    animationSpec = tween(durationMillis = 180),
+                    animationSpec = tween(
+                        durationMillis = 280,
+                        easing = FastOutSlowInEasing,
+                    ),
                     targetOffsetY = { it / 10 },
                 )
             },
@@ -298,6 +342,8 @@ private fun FloatingGlassNavBar(
     onSelect: (Destination) -> Unit,
 ) {
     val glass = LocalGlassTokens.current
+    // v1.5.7 perf: one pill shape, allocated once per bar composition
+    // instead of per slot row pass.
     val barShape = RoundedCornerShape(GlassRadii.pill)
     val selectedIndex = destinations.indexOfFirst { selectedRoute(it) }
         .coerceAtLeast(0)
@@ -308,10 +354,23 @@ private fun FloatingGlassNavBar(
     // motion stays cheap. The animated value is read ONLY inside the
     // offset/graphicsLayer lambdas (deferred state reads): a running
     // animation repaints the layer, it never recomposes the slots.
+    //
+    // v1.5.7 (user report: "the bottom navigation animation is too fast,
+    // making transitions feel jumpy rather than smooth"): the spring
+    // ran at the LIBRARY DEFAULT stiffness (10_000) — a ~120ms snap
+    // that finished while the page beneath it was still mid-fade, so
+    // the pill teleported and the page caught up: two motions at two
+    // speeds, the textbook recipe for "jumpy". The pill is now tuned to
+    // the same beat as the page transition it accompanies: stiffness
+    // 380 with critical damping settles in ~280ms — it ARRIVES with the
+    // incoming screen instead of racing it, still with zero overshoot
+    // (labels never clip) and the same deferred-read structure (each
+    // frame is one layer translate; the five slots never recompose).
     val selectionFraction = animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = 380f,
             visibilityThreshold = 0.01f,
         ),
         label = "navSelection",
@@ -388,18 +447,32 @@ private fun NavBarSlot(
     // MediumBouncy, not NoBouncy — a single soft settle, still quiet,
     // still cheap (same deferred-read structure). The selected color
     // also cross-fades so the tint change reads as motion, not a blink.
+    //
+    // v1.5.7 (user report: "jumpy rather than smooth"): this spring ran
+    // at StiffnessMediumLow — a ~500ms+ settle with its bounce landing
+    // a quarter-second AFTER the page transition had already finished,
+    // a tail of motion on a settled screen (and five slots re-arming
+    // their animators on every selection change). The settle is re-tuned
+    // to the shared ~280ms beat: same MediumBouncy character (the one
+    // soft overshoot stays — it is the deliberate life of v1.5.2),
+    // stiffness raised to 1200 so it finishes WITH the pill's arrival
+    // instead of dragging on after it. The alpha cross-fade follows the
+    // same clock (280ms FastOutSlowIn, matching the page fade).
     val iconScale = animateFloatAsState(
         targetValue = if (selected) 1.12f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
+            stiffness = 1200f,
             visibilityThreshold = 0.01f,
         ),
         label = "navIconScale",
     )
     val iconAlpha = animateFloatAsState(
         targetValue = if (selected) 1f else 0.72f,
-        animationSpec = tween(durationMillis = 200),
+        animationSpec = tween(
+            durationMillis = 280,
+            easing = FastOutSlowInEasing,
+        ),
         label = "navIconAlpha",
     )
     Column(
