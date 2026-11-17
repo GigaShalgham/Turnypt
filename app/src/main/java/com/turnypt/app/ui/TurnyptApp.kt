@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -234,6 +235,11 @@ private fun FloatingGlassNavBar(
         label = "navSelection",
     )
 
+    // v1.4.1 bugfix: the Row of slots is the size-defining child (a real
+    // measured height), and the sliding pill sits in a matchParentSize
+    // wrapper BEHIND it. In v1.4.0 every child was matchParentSize — such
+    // children are excluded from the parent's size resolution, so the bar
+    // resolved to ZERO height and the whole navigation was invisible.
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
@@ -244,15 +250,20 @@ private fun FloatingGlassNavBar(
         // The sliding selection pill under the active slot's content.
         Box(
             modifier = Modifier
-                .width(slotWidth)
                 .matchParentSize()
-                .background(
-                    MaterialTheme.colorScheme.primaryContainer,
-                    barShape,
-                )
                 .offset(x = slotWidth * selectionFraction),
-        )
-        Row(modifier = Modifier.matchParentSize()) {
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(slotWidth)
+                    .fillMaxHeight()
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        barShape,
+                    ),
+            )
+        }
+        Row {
             destinations.forEach { destination ->
                 val selected = selectedRoute(destination)
                 NavBarSlot(

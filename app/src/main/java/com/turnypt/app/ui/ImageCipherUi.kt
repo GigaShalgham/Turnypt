@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -104,6 +105,10 @@ fun ToolSegmentRow(
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 380f),
         label = "segmentIndicator",
     )
+    // v1.4.1 bugfix: the Row of options is the size-defining child; the
+    // sliding indicator sits in a matchParentSize wrapper BEHIND it. In
+    // v1.4.0 every child was matchParentSize, so the control resolved to
+    // ZERO height — the whole Text|Image switch was invisible.
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
@@ -113,15 +118,20 @@ fun ToolSegmentRow(
         val halfWidth = maxWidth / 2
         Box(
             modifier = Modifier
-                .width(halfWidth)
                 .matchParentSize()
-                .background(
-                    MaterialTheme.colorScheme.primaryContainer,
-                    shape,
-                )
                 .offset(x = halfWidth * indicatorFraction),
-        )
-        Row(modifier = Modifier.matchParentSize()) {
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(halfWidth)
+                    .fillMaxHeight()
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        shape,
+                    ),
+            )
+        }
+        Row {
             SegmentOption(
                 label = stringResource(R.string.segment_text),
                 icon = TurnyptIcons.Lock,

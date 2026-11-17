@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-17 — the invisible navigation bugfix
+
+### Fixed
+
+- **The floating navigation bar rendered at ZERO height** (and was
+  therefore invisible — no way to reach Encrypt/Decrypt/Contacts/
+  Settings from the bar). In Compose, children using `matchParentSize()`
+  are excluded from the parent's size resolution; in v1.4.0 every child
+  of the bar (the sliding selection pill AND the slot row) used it, so
+  the wrap-content bar resolved to nothing. The slot row is now the
+  size-defining child and the pill sits behind it in a `matchParentSize`
+  wrapper — the intended Liquid Glass layout, finally visible.
+- **The Text | Image segmented control rendered at ZERO height** the
+  same way (all children `matchParentSize`) on the Encrypt, Decrypt tabs
+  and the image companion sheet — the image mode was unreachable. Same
+  restructure, same fix.
+- The sliding selection pill also ignored its intended width
+  (`matchParentSize` overrides an incoming `width`), so even where it
+  rendered it spanned the whole track instead of one slot/half. It now
+  takes its true slot width inside the wrapper.
+
+No behaviour, route or state change — this is purely the v1.4.0
+redesign's two collapsed layouts made visible again.
+
 ## [1.4.0] - 2026-11-17 — Liquid Glass redesign
 
 A complete visual redesign of every surface in Apple's **Liquid Glass**
