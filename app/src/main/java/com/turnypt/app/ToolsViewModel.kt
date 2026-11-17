@@ -140,6 +140,12 @@ data class ToolsUiState(
     val imageSavedAfterDecrypt: Boolean = false,
     /** The user's cipher preference (null until loaded). */
     val cipherPreference: CipherPreference? = null,
+    /**
+     * v1.3.2: the custom file-extension suffix for NEW encrypted names
+     * (null until loaded / when the setting is OFF). The encrypt tab's
+     * SAF dialog suggests names under this suffix when set.
+     */
+    val customFileSuffix: String? = null,
     /** What that preference resolves to on THIS device (chip label). */
     val resolvedCipherName: String? = null,
 ) {
@@ -255,6 +261,9 @@ class ToolsViewModel @Inject constructor(
                 contacts = contacts,
                 unlocked = unlocked,
                 selectedContactId = selected,
+                // v1.3.2: the encrypt tab's SAF dialog names new files
+                // under the live custom suffix (null keeps the defaults).
+                customFileSuffix = customFileSuffix(),
             )
             if (selected != null) armUnlockForSelection(selected)
         }
@@ -380,6 +389,17 @@ class ToolsViewModel @Inject constructor(
             imageProgressBytes = 0,
             imageProgressTotal = null,
         )
+    }
+
+    /**
+     * v1.3.2: the effective custom file-extension suffix for NEW encrypted
+     * names, resolved from the live settings — null when the setting is OFF
+     * (or no valid suffix is stored), which keeps every default path
+     * (.tnpi/.cki) exactly as before.
+     */
+    private suspend fun customFileSuffix(): String? {
+        val s = settings.settings.first()
+        return if (s.customFileExtensionEnabled) s.customFileExtension.takeIf { it.isNotBlank() } else null
     }
 
     /**
@@ -526,10 +546,15 @@ class ToolsViewModel @Inject constructor(
         when (outcome) {
             is MediaEncryptOutcome.Encrypted -> {
                 settings.setLastContactId(contactId.value)
+                // v1.3.2: the fallback (no queryable display name) honours
+                // the custom suffix so the result card never names a
+                // custom-suffixed file ".tnpi".
+                val suffix = customFileSuffix()
                 val savedName = streams.queryDisplayName(outputUri)
                     ?: ImageFiles.suggestedEncryptedName(
                         _state.value.pickedImage?.displayName,
                         _state.value.pickedImage?.mime,
+                        suffix,
                     )
                 _state.value = _state.value.copy(
                     busy = false,
@@ -613,7 +638,14 @@ class ToolsViewModel @Inject constructor(
                     imageBusy = false,
                     imageDecryptResult = ImageDecryptDone(
                         cacheFileUriString = cache.toURI().toString(),
-                        suggestedName = ImageFiles.suggestedPlaintextName(displayName, mime),
+                        suggestedName = ImageFiles.suggestedPlaintextName(
+                            displayName,
+                            mime,
+                            // v1.3.2: strip the custom suffix too, so a
+                            // custom-named output's plaintext restore keeps
+                            // working ("photo.jpg.secret" -> "photo.jpg").
+                            customFileSuffix(),
+                        ),
                         mime = mime,
                         isImage = isImage,
                         preview = preview,

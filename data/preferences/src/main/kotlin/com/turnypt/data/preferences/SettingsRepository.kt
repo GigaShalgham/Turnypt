@@ -42,6 +42,43 @@ enum class CipherPreference {
 }
 
 /**
+ * v1.3.2: the user's custom extension for encrypted files, applied when the
+ * "custom file extension" setting is ON. Purely a NAMING preference: the
+ * file's content (the CKF1 magic) decides what it is, decryption never
+ * depends on the name, and every file ever written under .tnpi/.cki keeps
+ * opening exactly as before.
+ */
+object CustomFileExtension {
+
+    /** Shortest sane suffix ("x"); "tnpi"-length names fit comfortably. */
+    const val MIN_LENGTH: Int = 1
+
+    /** Longest sane suffix — a filename, not a sentence. */
+    const val MAX_LENGTH: Int = 16
+
+    /** The reserved suffixes that stay Turnypt's own, never user-settable. */
+    val RESERVED: Set<String> = setOf("cki", "tnpi")
+
+    /**
+     * Sanitizes a user-entered suffix into a safe one, or null when it
+     * cannot be salvaged. A leading dot is accepted and stripped ("​.secret"
+     * -> "secret"); letters, digits, hyphens and underscores survive;
+     * whitespace is trimmed; anything else (dots inside, path separators,
+     * control characters, unicode whitespace tricks) rejects the input —
+     * a filename suffix must round-trip through every filesystem and SAF
+     * provider without surprises. Reserved Turnypt suffixes are refused so
+     * a custom value can never masquerade as the defaults.
+     */
+    fun sanitize(raw: String): String? {
+        val trimmed = raw.trim().removePrefix(".").trim()
+        if (trimmed.length !in MIN_LENGTH..MAX_LENGTH) return null
+        if (trimmed.any { !it.isLetterOrDigit() && it != '-' && it != '_' }) return null
+        if (trimmed.lowercase() in RESERVED) return null
+        return trimmed.lowercase()
+    }
+}
+
+/**
  * User-facing security settings.
  *
  * Defaults come from [KeyPolicy]/[Argon2Profile]; persisted values are
@@ -60,6 +97,14 @@ data class AppSettings(
     val clipboardHistoryEnabled: Boolean = true,
     /** v0.6.0: cipher used for NEW encryptions (default Automatic). */
     val preferredCipher: CipherPreference = CipherPreference.AUTO,
+    /**
+     * v1.3.2: name NEW encrypted files with the user's custom suffix
+     * instead of Turnypt's (.tnpi images / .cki others). OFF by default —
+     * the ecosystem suffixes stay the default experience.
+     */
+    val customFileExtensionEnabled: Boolean = false,
+    /** v1.3.2: the sanitized suffix applied when the toggle is ON ("secret"). */
+    val customFileExtension: String = "",
 )
 
 class SettingsRepository(
@@ -81,6 +126,12 @@ class SettingsRepository(
             clipboardHistoryEnabled = prefs[KEY_CLIPBOARD_HISTORY] ?: true,
             preferredCipher = CipherPreference.fromName(prefs[KEY_PREFERRED_CIPHER])
                 ?: CipherPreference.AUTO,
+            // v1.3.2: re-validate on read — a corrupted or forged store
+            // value falls back to the blank default (the toggle's OFF
+            // state then simply keeps the ecosystem suffixes).
+            customFileExtensionEnabled = prefs[KEY_CUSTOM_EXT_ENABLED] ?: false,
+            customFileExtension = prefs[KEY_CUSTOM_EXT]?.let(CustomFileExtension::sanitize)
+                ?: "",
         )
     }
 
@@ -131,6 +182,31 @@ class SettingsRepository(
     }
 
     /**
+     * v1.3.2: toggles the custom file-extension naming. OFF also blanks the
+     * stored suffix so a later re-enable starts from a clean slate rather
+     * than resurrecting a forgotten value — "off" must mean off.
+     */
+    suspend fun setCustomFileExtensionEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_CUSTOM_EXT_ENABLED] = enabled
+            if (!enabled) prefs.remove(KEY_CUSTOM_EXT)
+        }
+    }
+
+    /**
+     * v1.3.2: stores the custom suffix (sanitized; rejected input throws
+     * [IllegalArgumentException] so the Settings row can show the honest
+     * error instead of silently keeping the old value).
+     */
+    suspend fun setCustomFileExtension(raw: String) {
+        val sanitized = CustomFileExtension.sanitize(raw)
+            ?: throw IllegalArgumentException("invalid file extension: $raw")
+        dataStore.edit { prefs ->
+            prefs[KEY_CUSTOM_EXT] = sanitized
+        }
+    }
+
+    /**
      * Sticky companion contact: the last contact the user encrypted for,
      * so the PROCESS_TEXT encrypt flow usually needs zero extra taps
      * (spec 003, FR-005).
@@ -162,6 +238,8 @@ class SettingsRepository(
         private val KEY_ASSISTANT_ENABLED = booleanPreferencesKey("assistant_enabled")
         private val KEY_CLIPBOARD_HISTORY = booleanPreferencesKey("clipboard_history_enabled")
         private val KEY_PREFERRED_CIPHER = stringPreferencesKey("preferred_cipher")
+        private val KEY_CUSTOM_EXT_ENABLED = booleanPreferencesKey("custom_file_extension_enabled")
+        private val KEY_CUSTOM_EXT = stringPreferencesKey("custom_file_extension")
 
         /** Factory for the process-wide DataStore instance. */
         fun defaultDataStore(context: Context): DataStore<Preferences> = context.turnyptDataStore

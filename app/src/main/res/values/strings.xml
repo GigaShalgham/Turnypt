@@ -267,6 +267,14 @@
     <string name="settings_features_section">Features</string>
 
     <!-- v0.5.2: Settings clipboard-history rows. -->
+    <!-- v1.3.2: custom file extension (off by default). -->
+    <string name="settings_custom_ext_title">Custom file extension</string>
+    <string name="settings_custom_ext_summary">Name new encrypted files with your own suffix instead of Turnypt\'s (.tnpi images, .cki others). Decryption never depends on the name — files encrypted with any suffix keep opening. Off by default.</string>
+    <string name="settings_custom_ext_field_label">File extension</string>
+    <string name="settings_custom_ext_field_support">Letters, digits, - and _ only, 1\u201316 characters. Reserved: cki, tnpi.</string>
+    <string name="settings_custom_ext_error">That suffix is not allowed — use 1\u201316 letters, digits, - or _ (not cki/tnpi).</string>
+    <string name="settings_custom_ext_needs_value">Type a suffix first — the field is right there in this row.</string>
+    <string name="settings_custom_ext_save">Use this suffix</string>
     <string name="settings_clipboard_history_title">Clipboard history</string>
     <string name="settings_clipboard_history_summary">Keep the last 25 things you copied (for 7 days) so you can reuse them from the Encrypt and Decrypt tabs. Decrypted text and passphrases are never stored.</string>
 

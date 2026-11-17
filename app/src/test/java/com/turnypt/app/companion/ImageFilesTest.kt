@@ -1,5 +1,6 @@
 package com.turnypt.app.companion
 
+import com.turnypt.data.preferences.CustomFileExtension
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -169,5 +170,74 @@ class ImageFilesTest {
         assertEquals("512 KB", ImageFiles.formatSize(512 * 1024))
         assertEquals("1.5 MB", ImageFiles.formatSize(1_572_864))
         assertEquals("1.0 GB", ImageFiles.formatSize(1_073_741_824))
+    }
+
+    // ------------------------------------------- v1.3.2 custom suffix
+
+    @Test
+    fun `sanitize accepts sane suffixes and normalizes them`() {
+        assertEquals("secret", CustomFileExtension.sanitize("secret"))
+        assertEquals("secret", CustomFileExtension.sanitize("  .SECRET "))
+        assertEquals("my-lock_2", CustomFileExtension.sanitize("my-lock_2"))
+        assertEquals("x", CustomFileExtension.sanitize("x"))
+        // A leading dot is accepted; a trailing dot is junk.
+        assertNull(CustomFileExtension.sanitize(".a."))
+    }
+
+    @Test
+    fun `sanitize refuses junk reserved and oversized input`() {
+        // Empty / whitespace-only.
+        assertNull(CustomFileExtension.sanitize(""))
+        assertNull(CustomFileExtension.sanitize("   "))
+        assertNull(CustomFileExtension.sanitize("."))
+        // Reserved Turnypt suffixes — a custom value may never masquerade.
+        assertNull(CustomFileExtension.sanitize("tnpi"))
+        assertNull(CustomFileExtension.sanitize(".CKI"))
+        // Separators, dots inside, path tricks, control characters.
+        assertNull(CustomFileExtension.sanitize("a.b"))
+        assertNull(CustomFileExtension.sanitize("a/b"))
+        assertNull(CustomFileExtension.sanitize("a\\b"))
+        assertNull(CustomFileExtension.sanitize("a b"))
+        assertNull(CustomFileExtension.sanitize("a*b?"))
+        // Beyond the length bounds.
+        assertNull(CustomFileExtension.sanitize("abcdefghijklmnopq"))
+    }
+
+    @Test
+    fun `custom suffix replaces the ecosystem suffix everywhere`() {
+        assertEquals("photo.jpg.secret", ImageFiles.suggestedEncryptedName("photo.jpg", customExtension = "secret"))
+        assertEquals("notes.txt.secret", ImageFiles.suggestedEncryptedName("notes.txt", customExtension = "secret"))
+        assertEquals("image.secret", ImageFiles.suggestedEncryptedName(null, customExtension = "secret"))
+        // The image-extension derivation step is skipped for custom names:
+        // a single custom suffix replaces the whole tnpi layer.
+        assertEquals("IMG_001.secret", ImageFiles.suggestedEncryptedName("IMG_001", "image/png", "secret"))
+    }
+
+    @Test
+    fun `custom suffix never double-suffixes encrypted passthrough names`() {
+        // Names already encrypted stay untouched — the user can re-encrypt
+        // a copy of an existing .tnpi without mangling it.
+        assertEquals("photo.jpg.tnpi", ImageFiles.suggestedEncryptedName("photo.jpg.tnpi", customExtension = "secret"))
+        assertEquals("photo.jpg.cki", ImageFiles.suggestedEncryptedName("photo.jpg.cki", customExtension = "secret"))
+    }
+
+    @Test
+    fun `null or blank custom suffix keeps the defaults`() {
+        assertEquals("photo.jpg.tnpi", ImageFiles.suggestedEncryptedName("photo.jpg", customExtension = null))
+        assertEquals("photo.jpg.tnpi", ImageFiles.suggestedEncryptedName("photo.jpg", customExtension = ""))
+        assertEquals("notes.txt.cki", ImageFiles.suggestedEncryptedName("notes.txt", customExtension = null))
+    }
+
+    @Test
+    fun `original names strip the custom suffix too`() {
+        assertEquals("photo.jpg", ImageFiles.suggestedOriginalName("photo.jpg.secret", "secret"))
+        assertEquals("notes", ImageFiles.suggestedOriginalName("notes.secret", "secret"))
+        assertEquals("photo.jpg", ImageFiles.suggestedPlaintextName("photo.jpg.secret", null, "secret"))
+        // A custom-suffixed output with no remaining extension still gets
+        // its extension from the sniffed plaintext.
+        assertEquals("photo.jpg", ImageFiles.suggestedPlaintextName("photo.secret", "image/jpeg", "secret"))
+        // Without the custom suffix supplied, a custom-named file passes
+        // through unchanged (same as any unknown suffix always has).
+        assertEquals("photo.jpg.secret", ImageFiles.suggestedOriginalName("photo.jpg.secret"))
     }
 }

@@ -100,12 +100,27 @@ object ImageFiles {
      *  - anything not recognizable as an image keeps the legacy
      *    `<name>.cki` suffix — those files still open through the .cki
      *    filters as before.
+     *
+     * v1.3.2 [customExtension]: the "custom file extension" setting, when
+     * ON, replaces the suffix EVERYWHERE above — `photo.jpg` →
+     * `photo.jpg.secret`, `notes.txt` → `notes.txt.secret`, a null name →
+     * `image.secret`. The suffix was sanitized at the settings layer
+     * ([CustomFileExtension.sanitize]), so it cannot be a reserved
+     * Turnypt suffix or contain separators; passthrough for names already
+     * encrypted still applies. Naming only: the CKF1 magic decides what a
+     * file IS, so every file still opens regardless of its suffix.
      */
-    fun suggestedEncryptedName(displayName: String?, mime: String? = null): String {
+    fun suggestedEncryptedName(
+        displayName: String?,
+        mime: String? = null,
+        customExtension: String? = null,
+    ): String {
+        val suffix = customExtension?.takeIf { it.isNotBlank() }
         val base = displayName?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
-            ?: return "image.$ENCRYPTED_IMAGE_EXTENSION"
+            ?: return "image.${suffix ?: ENCRYPTED_IMAGE_EXTENSION}"
         if (base.endsWith(".${Ckf1.FILE_EXTENSION}", ignoreCase = true)) return base
         if (hasEncryptedImageExtension(base)) return base
+        if (suffix != null) return "$base.$suffix"
         val derived = extensionForMime(mime)
         val imageBase = when {
             hasImageExtension(base) -> base
@@ -123,14 +138,27 @@ object ImageFiles {
      * "photo.jpg.tnpi" -> "photo.jpg"; "photo.jpg.cki" -> "photo.jpg";
      * a v1.2.0-era real-extension name ("photo.jpg") and anything else
      * pass through unchanged.
+     *
+     * v1.3.2 [customExtension]: also strips the user's custom suffix when
+     * supplied ("photo.jpg.secret" -> "photo.jpg") — the plaintext restore
+     * works for custom-named outputs too. Only the LAST dotted segment is
+     * ever considered, and only when it matches: a file named
+     * "archive.tar" with custom suffix "tar" would collide — the settings
+     * layer refuses reserved suffixes but cannot know the user's whole
+     * filename universe, so this is documented behaviour (renaming the
+     * source is the fix), mirroring how ".cki"/".tnpi" stripping has
+     * always worked.
      */
-    fun suggestedOriginalName(displayName: String?): String {
+    fun suggestedOriginalName(displayName: String?, customExtension: String? = null): String {
         val base = displayName?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: return "file"
+        val custom = customExtension?.takeIf { it.isNotBlank() }
         return when {
             base.endsWith(".${Ckf1.FILE_EXTENSION}", ignoreCase = true) ->
                 base.dropLast(Ckf1.FILE_EXTENSION.length + 1).ifBlank { "file" }
             base.endsWith(".$ENCRYPTED_IMAGE_EXTENSION", ignoreCase = true) ->
                 base.dropLast(ENCRYPTED_IMAGE_EXTENSION.length + 1).ifBlank { "file" }
+            custom != null && base.endsWith(".$custom", ignoreCase = true) ->
+                base.dropLast(custom.length + 1).ifBlank { "file" }
             else -> base
         }
     }
@@ -142,9 +170,16 @@ object ImageFiles {
      * extension comes from the DECRYPTED CONTENT's sniffed MIME — the one
      * honest witness of what the plaintext actually is
      * ("photo" + image/jpeg -> "photo.jpg").
+     *
+     * v1.3.2 [customExtension]: forwarded to [suggestedOriginalName] so
+     * custom-suffixed outputs strip correctly.
      */
-    fun suggestedPlaintextName(displayName: String?, sniffedMime: String?): String {
-        val name = suggestedOriginalName(displayName)
+    fun suggestedPlaintextName(
+        displayName: String?,
+        sniffedMime: String?,
+        customExtension: String? = null,
+    ): String {
+        val name = suggestedOriginalName(displayName, customExtension)
         if (name.substringAfterLast('.', "").isNotEmpty()) return name
         return extensionForMime(sniffedMime)?.let { "$name.$it" } ?: name
     }
@@ -154,6 +189,10 @@ object ImageFiles {
      * carry the Turnypt image type; everything else (`.cki` and the
      * v1.2.0-era real-extension files) carries the honest generic
      * x-cipherkey type — it is Turnypt ciphertext, never a real image.
+     *
+     * v1.3.2: a custom-suffixed output is not a `.tnpi` file, so it
+     * shares the honest generic type (the receiver's system routes by
+     * content anyway — the CKF1 magic decides).
      */
     fun encryptedShareMime(name: String?): String =
         if (hasEncryptedImageExtension(name ?: "")) ENCRYPTED_IMAGE_MIME else Ckf1.MIME_TYPE

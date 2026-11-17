@@ -254,6 +254,14 @@
     <string name="settings_features_section">ویژگی‌ها</string>
 
     <!-- v0.5.2: ردیف‌های تاریخچهٔ کلیپ‌بورد در تنظیمات. -->
+    <!-- v1.3.2: پسوند سفارشی فایل (به‌طور پیش‌فرض خاموش). -->
+    <string name="settings_custom_ext_title">پسوند سفارشی فایل</string>
+    <string name="settings_custom_ext_summary">فایل‌های رمزنگاری‌شدهٔ جدید به‌جای پسوند Turnypt (‎.tnpi برای تصاویر، ‎.cki برای بقیه) با پسوند خودتان نام‌گذاری می‌شوند. رمزگشایی هرگز به نام وابسته نیست — فایل‌هایی با هر پسوندی همچنان باز می‌شوند. پیش‌فرض خاموش است.</string>
+    <string name="settings_custom_ext_field_label">پسوند فایل</string>
+    <string name="settings_custom_ext_field_support">فقط حرف، رقم، - و _؛ ۱ تا ۱۶ نویسه. رزرو‌شده: cki و tnpi.</string>
+    <string name="settings_custom_ext_error">این پسوند مجاز نیست — ۱ تا ۱۶ حرف، رقم، - یا _ به‌کار ببرید (نه cki/tnpi).</string>
+    <string name="settings_custom_ext_needs_value">اول یک پسوند بنویسید — همین‌جا در همین ردیف.</string>
+    <string name="settings_custom_ext_save">از این پسوند استفاده کن</string>
     <string name="settings_clipboard_history_title">تاریخچهٔ کلیپ‌بورد</string>
     <string name="settings_clipboard_history_summary">۲۵ مورد آخر چیزهایی که کپی کرده‌اید (تا ۷ روز) نگه داشته می‌شود تا از تب‌های رمزنگاری و رمزگشایی دوباره استفاده کنید. متن رمزگشایی‌شده و پسوردها هرگز ذخیره نمی‌شوند.</string>
 

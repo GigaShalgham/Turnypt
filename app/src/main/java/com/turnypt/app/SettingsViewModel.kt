@@ -35,6 +35,15 @@ import com.turnypt.security.policies.Argon2Profile
 sealed interface SettingsEvent {
     /** Open the system "Display over other apps" screen for Turnypt. */
     data object RequestOverlayPermission : SettingsEvent
+
+    /**
+     * v1.3.2: the custom-file-extension toggle was turned ON with no valid
+     * suffix stored yet — the row asks for one (the field is the same row).
+     */
+    data object CustomFileExtensionNeedsValue : SettingsEvent
+
+    /** v1.3.2: the entered suffix is invalid (the row shows the honest error). */
+    data object CustomFileExtensionInvalid : SettingsEvent
 }
 
 @HiltViewModel
@@ -121,6 +130,38 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.setPreferredCipher(preference)
             refreshResolvedCipher()
+        }
+    }
+
+    /**
+     * v1.3.2: the "custom file extension" toggle. Invalid input is refused
+     * with an honest error string (resolvable) instead of a silent no-op —
+     * and a REFUSED value never disables what already works, so the row
+     * keeps its previous state on error.
+     */
+    fun setCustomFileExtensionEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            if (enabled) {
+                // Enabling requires a valid stored suffix: with none saved yet,
+                // the caller must save one first (the Settings row's flow).
+                val current = settingsRepository.settings.first().customFileExtension
+                if (current.isBlank()) {
+                    _events.emit(SettingsEvent.CustomFileExtensionNeedsValue)
+                    return@launch
+                }
+            }
+            settingsRepository.setCustomFileExtensionEnabled(enabled)
+        }
+    }
+
+    /** v1.3.2: store the custom suffix; null on invalid input (row shows the error). */
+    fun setCustomFileExtension(raw: String) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setCustomFileExtension(raw)
+            } catch (e: IllegalArgumentException) {
+                _events.emit(SettingsEvent.CustomFileExtensionInvalid)
+            }
         }
     }
 

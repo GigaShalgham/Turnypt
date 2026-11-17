@@ -44,8 +44,10 @@ When an app's selection toolbar is unavailable, the Home screen offers an
   with the same passphrase (chunk-wise-authenticated files; one
   64 KiB chunk in memory at a time, so any file size is safe). Encrypted
   images carry the Turnypt-ecosystem extension — `photo.jpg.tnpi` — and
-  anything else stays `.cki`. Reachable from Quick Access, the
-  Encrypt/Decrypt tabs (Text | Image switch), the sharesheet, the
+  anything else stays `.cki` (a Settings option, v1.3.2, can name new
+  encrypted files with your own suffix instead — off by default, and
+  decryption never depends on the name). Reachable from Quick Access,
+  the Encrypt/Decrypt tabs (Text | Image switch), the sharesheet, the
   floating assistant — and since v1.0.0, tapping a `.cki` file, and since
   v1.3.0 a `.tnpi` file, in ANY file manager offers Turnypt directly.
 - **Nothing sensitive at rest** — the passphrase is never stored; unlocked

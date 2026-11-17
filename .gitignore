@@ -13,3 +13,4 @@
 *.keystore
 !debug.keystore
 keystore.properties
+.kotlin/

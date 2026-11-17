@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-17 — custom file extension (off by default)
+
+User request: "add an option in setting named Custom file extention and
+turn it off in default".
+
+### Added
+
+- **Custom file extension** — a new Settings row (in the Features
+  section, after Clipboard history), **off by default**: when ON, NEW
+  encrypted files are named with the user's own suffix instead of
+  Turnypt's ecosystem suffixes (`photo.jpg.tnpi` → `photo.jpg.secret`;
+  non-image sources `notes.txt.cki` → `notes.txt.secret`). The row
+  carries its own field — type the suffix, save it, then flip the
+  toggle; enabling with no stored value or entering an invalid one
+  shows an honest error banner instead of a silent no-op.
+  - The suffix is sanitized and validated at every layer:
+    letters/digits/`-`/`_` only, 1–16 characters, a leading dot accepted
+    and stripped, and the reserved Turnypt suffixes (`cki`, `tnpi`)
+    refused so a custom value can never masquerade as the defaults;
+    persisted values are re-validated on read (a corrupted or forged
+    store falls back to blank/OFF).
+  - Naming only — what a file IS was always decided by CONTENT (the
+    CKF1 magic), so decryption never depends on the name: every file
+    ever written under `.tnpi`/`.cki` (or any custom suffix) keeps
+    opening exactly as before, and the plaintext restore strips the
+    custom suffix too (`photo.jpg.secret` → suggested save name
+    `photo.jpg`). Names already carrying `.tnpi`/`.cki` still pass
+    through unchanged — no double suffixing.
+  - Turning the toggle OFF also blanks the stored suffix — "off" must
+    mean off, so a later re-enable starts from a clean slate.
+  - 7 new test groups cover the sanitizer (accepts/normalizes, refuses
+    junk/reserved/oversized), suffix replacement across image and
+    non-image sources, passthrough for already-encrypted names,
+    default-preserving null/blank suffixes, and the original-name/
+    plaintext-name stripping.
+
 ## [1.3.1] - 2026-11-16 — lock-time fix + Vazirmatn
 
 Two user reports in one: "changing lock time had some bugs and didn't

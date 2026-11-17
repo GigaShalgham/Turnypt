@@ -404,6 +404,9 @@ private fun ImageCipherSheet(
                             ImageFiles.suggestedEncryptedName(
                                 state.pickedImage?.displayName,
                                 state.pickedImage?.mime,
+                                // v1.3.2: the custom file-extension setting,
+                                // when ON, replaces the ecosystem suffix.
+                                state.customFileSuffix,
                             ),
                         )
                     },
