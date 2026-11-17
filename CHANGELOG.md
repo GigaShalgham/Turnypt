@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-17 — three visual corrections (prerelease)
+
+The follow-up batch to the Turnip identity: three user-reported visual
+defects, each fixed at its cause. **No layout, structure, or behaviour
+changes.**
+
+- **Restored the launcher background.** The v1.5.0 logo field pass
+  (`#2A2440`) read visually worse than the aubergine it replaced; the
+  launcher background and the icon's keyhole/leaf fills are reverted to
+  their previous treatment (`#331B52` field, matching keyhole) exactly as
+  they were — the turnip artwork, proportions, and positioning are
+  untouched.
+- **Uniform glassmorphism on the bottom navigation.** The bar's specular
+  bevel covered only the top 45% and its rim faded to 35% alpha at the
+  bottom, so the upper half read as glass while the lower half read as a
+  solid purple slab. Both layers now span the full height of every glass
+  surface: one continuous specular gradient (still fading downward, still
+  restrained) and one uniform hairline rim — one pane, top to bottom.
+- **Removed the selection flash on the Encrypt/Decrypt Text|Image
+  segment.** The bare `clickable` on each half drew the default
+  unclipped ripple — a translucent square with no rounded corners and
+  no border — that flashed over the pill track during selection. The
+  halves are now invisible 48dp buttons (same treatment as the nav
+  slots): the sliding indicator is the selection feedback, nothing else.
+- Contrast pairs are untouched (38 pairs audited for v1.5.0 remain
+  ≥ 4.5:1); the system-nav inset positioning from v1.5.0 is preserved.
+
 ## [1.5.0] - 2026-11-17 — the Turnip identity (prerelease)
 
 A visual-identity pass on the v1.4.0 structure — **same layout, same

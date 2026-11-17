@@ -10,6 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -176,7 +177,20 @@ private fun SegmentOption(
     Box(
         modifier = modifier
             .heightIn(min = 48.dp)
-            .clickable(onClick = onClick),
+            // v1.5.1 (user report: a transparent SQUARE briefly flashes
+            // over the segment on tap): the bare `clickable` drew the
+            // default Material ripple — an UNCLIPPED translucent
+            // rectangle with no rounded corners and no border — over
+            // the pill-shaped glass track, so it flashed as a hard
+            // square during the selection animation. Same fix as the
+            // nav slots (TurnyptApp.kt): an invisible button — the
+            // sliding indicator IS the selection feedback, an overlay
+            // rectangle adds nothing but the artifact.
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Row(

@@ -125,31 +125,36 @@ fun Modifier.glassSurface(
         spotColor = glass.shadowColor,
     )
     .drawBehind {
+        val bevelTop = highlightBrushColor(glass, tint)
         drawRect(brush = Brush.verticalGradient(listOf(tint, tint)))
-        // Specular bevel: the top 45% (max 56dp) fades out — a curved
-        // highlight, not a flat stripe. Restrained alpha: a ceiling light,
-        // not a glow.
-        val bevelHeight = (size.height * 0.45f).coerceAtMost(56.dp.toPx())
+        // Specular bevel: v1.5.1 (user report: the bar's LOWER half read
+        // as a solid purple slab — "glass on top, flat on the bottom"):
+        // the bevel previously covered only the top 45%, splitting the
+        // surface into two visibly different halves. One continuous glass
+        // needs one continuous treatment — the specular gradient now
+        // spans the FULL height of every glass surface (still fading
+        // toward the bottom, still restrained alpha: a ceiling light
+        // raking the whole pane, not a stripe on the upper half).
         drawRect(
             brush = Brush.verticalGradient(
-                0f to highlightBrushColor(glass, tint),
-                1f to Color.Transparent,
-                startY = 0f,
-                endY = bevelHeight,
+                0f to bevelTop,
+                1f to bevelTop.copy(alpha = bevelTop.alpha * 0.3f),
             ),
-            size = androidx.compose.ui.geometry.Size(size.width, bevelHeight),
         )
     }
     .border(
         width = 1.dp,
-        brush = Brush.verticalGradient(
-            colors = listOf(
-                glass.border,
-                glass.border.copy(alpha = glass.border.alpha * 0.35f),
-            ),
-        ),
+        // The rim follows the same rule: a uniform hairline top to
+        // bottom. The old 0.35 bottom fade let the glass edge vanish
+        // midway, which read as the lower half being cut from different
+        // material; one pane means one rim.
+        borderBrush(glass),
         shape = shape,
     )
+
+/** The refraction rim: uniform alpha across the full surface height. */
+private fun borderBrush(glass: GlassColors): Brush =
+    Brush.verticalGradient(listOf(glass.border, glass.border))
 
 /** The bevel adapts to dark glass (a white band would fog OLED black). */
 private fun highlightBrushColor(glass: GlassColors, tint: Color): Color =
