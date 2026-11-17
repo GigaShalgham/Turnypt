@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-11-17 — three root-cause fixes (prerelease)
+
+The v1.5.2 follow-up: each of the three repeat reports is fixed at its
+systemic cause this time, not at a symptom.
+
+### Top overspill
+
+Edge-to-edge (targetSdk 36) drew the screens behind the status bar —
+no status-bar inset existed anywhere in the root, and the screens' plain
+16 dp padding let content scroll under the clock/status pills. The
+NavHost now insets its content past the status bar once, for every
+screen.
+
+### The bottom band under the menu — the real cause
+
+The v1.5.2 tint reduction treated the opacity, but the dark navTint was
+still a distinctly purple fill (0x66221D33 smoke-plum) laid over the
+backdrop's own plum — two near-neighbour purples stacking into a
+visibly darker band under the bar, which read as "extra purple
+background ruining the transparency." A pane of glass over this field
+must not ADD colour: the tint is now a low-alpha wash of the backdrop's
+OWN bottom colour (0x59 over 0xFF171522) — the bar area blends with
+what is behind it; the pane's presence comes from the violet rim and
+the soft shadow only. The light navTint keeps exact parity with the
+general glass tint.
+
+### Black text — the systemic cause
+
+MaterialTheme does NOT provide `LocalContentColor`; its composition
+local's factory default is `Color.Black`. Every `Text()`/`Icon()`
+without an explicit `color=` in the app therefore fell back to raw
+black — which is why the v1.5.2 one-by-one patches could never finish
+and "the texts are still black and don't match the dark background."
+Both theme roots now provide `LocalContentColor = onSurface` (app +
+keyboard IME): every colour-less content in the app defaults to the
+theme's onSurface, the same role M3 components use. Explicit colors
+(primary values, error banners, monospace codes) still override
+locally as before.
+
+versionCode 26 / versionName 1.5.3. Unit tests green (app 57, keyboard
+34; full matrix 496 unchanged — no logic touched).
+
 ## [1.5.2] - 2026-11-17 — the extension ruling, motion & polish (prerelease)
 
 Five user rulings/fixes in one batch.

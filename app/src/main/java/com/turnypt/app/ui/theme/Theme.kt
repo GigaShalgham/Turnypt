@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -222,14 +223,29 @@ fun TurnyptTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
+    val colorScheme = if (darkTheme) DarkColors else LightColors
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = colorScheme,
         typography = AppTypography,
         shapes = AppShapes,
     ) {
         CompositionLocalProvider(
             LocalSemanticColors provides if (darkTheme) DarkSemantic else LightSemantic,
             LocalGlassTokens provides if (darkTheme) DarkGlass else LightGlass,
+            // v1.5.3 (user report, second strike: "the black texts are
+            // STILL black and don't match the dark background"): the
+            // systemic cause — MaterialTheme does NOT provide
+            // LocalContentColor, so every Text()/Icon() without an
+            // explicit color= fell back to the composition local's
+            // factory default, which is Color.Black. Patching them one
+            // by one (v1.5.2) could never finish: any un-coloured text
+            // in dialogs, rows, envelopes stayed raw black on the dark
+            // field. Providing it HERE, at the root, defaults every
+            // colour-less content in the app to the theme's onSurface —
+            // the same role the M3 components themselves use. Explicit
+            // colors (primary hints, error banners, monospace values)
+            // still override it locally as before.
+            LocalContentColor provides colorScheme.onSurface,
         ) {
             content()
         }

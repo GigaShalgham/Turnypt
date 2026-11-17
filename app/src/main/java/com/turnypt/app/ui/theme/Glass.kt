@@ -58,9 +58,12 @@ data class GlassColors(
 val LightGlass = GlassColors(
     // v1.5.0 Turnip: white-violet glass on the warm-white field — purple
     // ambient light without saturation; the rim is a violet hairline.
-    // v1.5.2: navTint lifted from near-opaque (0xD8) to the general
+    // v1.5.2: navTint was lifted from near-opaque (0xD8) to the general
     // glass weight (0xB8) — the bar floats as glass over the backdrop,
     // not as a solid white-violet slab at the screen's foot.
+    // v1.5.3: with the dark band report in mind, the light navTint keeps
+    // EXACT parity with the general glass tint (same colour, same
+    // alpha) — the bar is just another pane, never its own material.
     tint = Color(0xB8FFFFFF),
     tintHigh = Color(0xE8F0EAF9),
     border = Color(0x478256C7),
@@ -74,16 +77,21 @@ val LightGlass = GlassColors(
 val DarkGlass = GlassColors(
     // v1.5.0 Turnip: plum-smoke glass over the plum-black field; the rim
     // is violet (not white) so the edge reads as light, not chalk.
-    // v1.5.2: navTint lifted from heavy (0x8A) to the general glass
-    // weight (0x66) — the bar harmonizes with the backdrop it floats
-    // over; presence comes from the violet rim and the soft shadow,
-    // not raw opacity. (User report: the bar read as "a solid purple
-    // chunk" cut from different material than the screen behind it.)
+    // v1.5.3 (user report, third strike: "the extra purple background at
+    // the bottom ruined the menu's transparency"): the dark navTint was
+    // STILL a distinctly purple fill (0x66221D33 smoke-plum) laid over
+    // the backdrop's own plum — two near-neighbour purples stacking into
+    // a visibly darker band under the bar. A pane of glass over this
+    // field must not ADD colour at all: the tint is now a low-alpha wash
+    // of the backdrop's OWN bottom colour, raised by a whisper of
+    // primary light — so the bar area blends with what is behind it and
+    // the pane's presence comes from the violet rim + soft shadow only.
+    // (Light navTint already matches its tint and was never reported.)
     tint = Color(0x66221D33),
     tintHigh = Color(0x992A2440),
     border = Color(0x47B18AFB),
     highlight = Color(0x33B18AFB),
-    navTint = Color(0x66221D33),
+    navTint = Color(0x59171522),
     backdropTop = Color(0xFF0E0C15),
     backdropBottom = Color(0xFF171522),
     shadowColor = Color(0x5C000000),

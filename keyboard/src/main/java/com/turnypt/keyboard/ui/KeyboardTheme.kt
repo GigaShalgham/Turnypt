@@ -89,9 +89,19 @@ private val ImeTypography = Typography(
 
 @Composable
 fun KeyboardTheme(content: @Composable () -> Unit) {
+    val colorScheme = if (isSystemInDarkTheme()) ImeDark else ImeLight
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) ImeDark else ImeLight,
+        colorScheme = colorScheme,
         typography = ImeTypography,
-        content = content,
-    )
+    ) {
+        // v1.5.3: the same LocalContentColor gap the app theme had —
+        // MaterialTheme does not provide it, so colour-less keys/labels
+        // fell back to Color.Black. Provided here with the IME's own
+        // onSurface, mirroring TurnyptTheme's root fix.
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides colorScheme.onSurface,
+        ) {
+            content()
+        }
+    }
 }

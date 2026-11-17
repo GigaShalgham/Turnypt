@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -140,6 +141,13 @@ fun TurnyptApp() {
             },
             modifier = Modifier
                 .fillMaxSize()
+                // v1.5.3 (user report: "the top of the app spills out a
+                // bit"): edge-to-edge is enforced at targetSdk 36 and NO
+                // status-bar inset existed anywhere in the root — the
+                // screens' plain 16dp padding let content scroll under
+                // the clock/status pills. The host insets its content
+                // past the status bar here, once, for every screen.
+                .statusBarsPadding()
                 // Room for the floating bar: the host insets its content
                 // so no scrollable's last item hides under the glass.
                 .padding(bottom = 88.dp),
