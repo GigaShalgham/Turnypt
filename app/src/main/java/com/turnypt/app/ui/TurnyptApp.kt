@@ -139,6 +139,22 @@ fun TurnyptApp() {
                     targetOffsetY = { it / 10 },
                 )
             },
+            // v1.5.6 (user report: "an unwanted opaque overlay sits between
+            // the main content and the floating glass menu — it covers the
+            // LOWER half of the menu's backdrop, so only the upper half
+            // reads as translucent glass, and scrolling content appears from
+            // behind it"): the host used to hard-cut its viewport 88dp above
+            // the screen foot (.padding(bottom = 88.dp)). The bar is ~64dp
+            // tall and floats as low as the navigation inset allows, so its
+            // lower half floated over a dead strip that showed nothing but
+            // the opaque backdrop — an opaque band sitting between the
+            // content and the menu, exactly as reported — and scrolling
+            // items vanished at the invisible cut line. The cut is now
+            // GONE: the host fills the whole screen, every scrollable
+            // scrolls UNDER the glass (content slides beneath the pane —
+            // the point of a floating bar), and each screen gives its own
+            // trailing clearance so the last resting item still clears the
+            // bar. Nothing opaque remains between content and glass.
             modifier = Modifier
                 .fillMaxSize()
                 // v1.5.3 (user report: "the top of the app spills out a
@@ -147,10 +163,7 @@ fun TurnyptApp() {
                 // screens' plain 16dp padding let content scroll under
                 // the clock/status pills. The host insets its content
                 // past the status bar here, once, for every screen.
-                .statusBarsPadding()
-                // Room for the floating bar: the host insets its content
-                // so no scrollable's last item hides under the glass.
-                .padding(bottom = 88.dp),
+                .statusBarsPadding(),
         ) {
             composable(DestinationRoute.HOME) {
                 HomeScreen(

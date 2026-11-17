@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -371,5 +373,11 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        // v1.5.6: the screen's own clearance under the floating glass bar
+        // (the NavHost viewport cut is gone; see TurnyptApp) — the last
+        // resting card clears the ~64dp pane, scrolled content slides
+        // beneath it.
+        Spacer(modifier = Modifier.height(96.dp))
     }
 }

@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.6] - 2026-11-17 — the overlay was the viewport cut (prerelease)
+
+### The opaque overlay between the content and the glass menu
+
+Fifth report on the strip under the floating bar, and this one named the
+mechanism exactly: an opaque layer between the content and the menu,
+covering the LOWER half of the menu's backdrop (only the upper half
+read as translucent glass), with scrolling content appearing from
+behind it.
+
+It was the NavHost's own viewport cut. The host carried
+`.padding(bottom = 88.dp)`, hard-cutting every screen's scrollable 88dp
+above the screen foot — while the ~64dp glass bar floats as low as the
+navigation inset allows (navInset + 12dp above the foot). On a gesture-
+nav device the bar spans roughly −100dp..−36dp from the foot, so its
+lower ~52dp floated over a dead strip that showed nothing but the
+opaque backdrop. That strip — no content, no glass sampling, nothing to
+show through — WAS the "unwanted opaque overlay": only the bar's upper
+fringe overlapped live content and read as glass, and scrolling items
+vanished at the invisible −88dp cut line instead of sliding beneath
+the pane.
+
+v1.5.5 had recolored that strip (uniform neutral backdrop) but never
+removed it — recoloring an opaque strip cannot make it translucent.
+
+The cut is now gone. The NavHost fills the whole screen; every
+scrollable scrolls UNDER the glass, so the pane's full height samples
+real content top to bottom — the floating-bar behaviour the glass was
+always meant to have. Each screen now provides its own trailing
+clearance (96dp: the ~64dp pane + its 12dp inset + margin) so the last
+resting item still clears the bar on every device:
+
+- Home, Encrypt, Decrypt, Settings: trailing spacer 8dp → 96dp
+  (Settings previously had none at all).
+- Contacts: list tail 80dp → 96dp.
+
+versionCode 29 / versionName 1.5.6.
+
 ## [1.5.5] - 2026-11-17 — the band, diagnosed at the pixels (prerelease)
 
 ### The purple block between the menu and the page elements

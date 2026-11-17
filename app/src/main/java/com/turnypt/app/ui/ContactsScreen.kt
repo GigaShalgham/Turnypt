@@ -156,7 +156,11 @@ fun ContactsScreen(viewModel: ContactsViewModel, biometrics: BiometricKeyStore) 
                             },
                         )
                     }
-                    item { Spacer(modifier = Modifier.height(80.dp)) }
+                    // v1.5.6: the list's own clearance under the floating
+                    // glass bar (the NavHost viewport cut is gone; see
+                    // TurnyptApp) — the last resting card clears the
+                    // ~64dp pane, scrolled cards slide beneath it.
+                    item { Spacer(modifier = Modifier.height(96.dp)) }
                 }
             }
         }
