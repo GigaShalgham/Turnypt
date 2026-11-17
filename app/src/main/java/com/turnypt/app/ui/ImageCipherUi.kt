@@ -4,18 +4,25 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -30,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -38,6 +46,9 @@ import java.io.File
 import com.turnypt.app.R
 import com.turnypt.app.ToolsUiState
 import com.turnypt.app.companion.ImageFiles
+import com.turnypt.app.ui.theme.GlassRadii
+import com.turnypt.app.ui.theme.LocalGlassTokens
+import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.data.preferences.CipherPreference
 
 /**
@@ -71,30 +82,91 @@ object ImageShare {
     }
 }
 
-/** The Text | Image segment switch at the top of the Encrypt/Decrypt tabs. */
+/** The Text | Image segment switch at the top of the Encrypt/Decrypt tabs.
+ *
+ * v1.4.0: the two FilterChips become ONE glass segmented control — a pill
+ * track with a spring-animated sliding selection indicator (the Liquid
+ * Glass take on a two-way switch). Same two options, same callbacks, each
+ * half a ≥48dp target; the selected half's text keeps the
+ * onPrimaryContainer contrast pair.
+ */
 @Composable
 fun ToolSegmentRow(
     imageSelected: Boolean,
     onTextSelected: () -> Unit,
     onImageSelected: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(
-            selected = !imageSelected,
-            onClick = onTextSelected,
-            label = { Text(stringResource(R.string.segment_text)) },
-            leadingIcon = {
-                Icon(TurnyptIcons.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
-            },
+    val glass = LocalGlassTokens.current
+    val shape = RoundedCornerShape(GlassRadii.pill)
+    // The indicator slides between the two halves of the track.
+    val indicatorFraction by animateFloatAsState(
+        targetValue = if (imageSelected) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 380f),
+        label = "segmentIndicator",
+    )
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassSurface(glass, shape, tint = glass.tintHigh)
+            .padding(4.dp),
+    ) {
+        val halfWidth = maxWidth / 2
+        Box(
+            modifier = Modifier
+                .width(halfWidth)
+                .matchParentSize()
+                .background(
+                    MaterialTheme.colorScheme.primaryContainer,
+                    shape,
+                )
+                .offset(x = halfWidth * indicatorFraction),
         )
-        FilterChip(
-            selected = imageSelected,
-            onClick = onImageSelected,
-            label = { Text(stringResource(R.string.segment_image)) },
-            leadingIcon = {
-                Icon(TurnyptIcons.Image, contentDescription = null, modifier = Modifier.size(16.dp))
-            },
-        )
+        Row(modifier = Modifier.matchParentSize()) {
+            SegmentOption(
+                label = stringResource(R.string.segment_text),
+                icon = TurnyptIcons.Lock,
+                selected = !imageSelected,
+                onClick = onTextSelected,
+                modifier = Modifier.weight(1f),
+            )
+            SegmentOption(
+                label = stringResource(R.string.segment_image),
+                icon = TurnyptIcons.Image,
+                selected = imageSelected,
+                onClick = onImageSelected,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/** One half of the segmented control — an invisible 48dp button. */
+@Composable
+private fun SegmentOption(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val fg = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Box(
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = fg)
+        }
     }
 }
 
@@ -102,6 +174,9 @@ fun ToolSegmentRow(
  * The cipher chip shown at the point of use: "Automatic → AES-256-GCM".
  * Tapping opens the same preference dialog Settings shows — one setting,
  * every surface.
+ *
+ * v1.4.0: a glass pill with a key medallion (secondaryContainer) — the
+ * "chips are glass" rule; same tap target and label.
  */
 @Composable
 fun CipherChip(
@@ -110,30 +185,40 @@ fun CipherChip(
     onClick: () -> Unit,
 ) {
     val resolved = resolvedName ?: return
+    val glass = LocalGlassTokens.current
     val label = when (preference) {
         CipherPreference.AUTO -> stringResource(R.string.cipher_auto_resolved, resolved)
         else -> stringResource(R.string.cipher_chip_label, resolved)
     }
-    Surface(
-        onClick = onClick,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = RoundedCornerShape(percent = 50),
+    Box(
+        modifier = Modifier
+            .glassSurface(glass, RoundedCornerShape(GlassRadii.pill))
+            .clickable(onClick = onClick),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(start = 12.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .padding(start = 12.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
         ) {
-            Icon(
-                TurnyptIcons.Key,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(14.dp),
-            )
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(GlassRadii.pill),
+            ) {
+                Icon(
+                    TurnyptIcons.Key,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier
+                        .padding(5.dp)
+                        .size(14.dp),
+                )
+            }
             Text(
                 label,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -147,15 +232,20 @@ fun PickedImageCard(
     busy: Boolean,
     onReplace: () -> Unit,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth(),
+    val glass = LocalGlassTokens.current
+    // v1.4.0: raised glass layer (tintHigh) — the picked file reads as an
+    // object resting ON the card glass.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassSurface(glass, RoundedCornerShape(GlassRadii.field), tint = glass.tintHigh),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.heightIn(min = 56.dp),
+            modifier = Modifier
+                .heightIn(min = 56.dp)
+                .padding(horizontal = 12.dp),
         ) {
             Icon(
                 TurnyptIcons.Image,
@@ -168,6 +258,7 @@ fun PickedImageCard(
                     displayName,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     sizeBytes?.let { ImageFiles.formatSize(it) } ?: "",
@@ -248,15 +339,21 @@ fun DecryptedImageCard(
         icon = TurnyptIcons.Image,
     ) {
         if (result.preview != null) {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = MaterialTheme.shapes.small,
+            // v1.4.0: the preview rests on a raised glass plate — depth
+            // between the photo and the card glass.
+            val glass = LocalGlassTokens.current
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .glassSurface(glass, RoundedCornerShape(GlassRadii.field), tint = glass.tintHigh),
             ) {
                 Image(
                     bitmap = result.preview,
                     contentDescription = null,
                     contentScale = ContentScale.FillWidth,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
                 )
             }
         } else {

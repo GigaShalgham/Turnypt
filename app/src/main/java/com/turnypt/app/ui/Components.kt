@@ -1,6 +1,12 @@
 package com.turnypt.app.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +40,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,26 +52,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.turnypt.app.R
 import com.turnypt.app.companion.UiNotice
+import com.turnypt.app.ui.theme.LocalGlassTokens
 import com.turnypt.app.ui.theme.LocalSemanticColors
+import com.turnypt.app.ui.theme.glassSurface
+import com.turnypt.app.ui.theme.GlassRadii
 import com.turnypt.security.policies.PassphraseAdvisor
 
 /**
- * Shared building blocks — the v0.5 "Calm Vault" component set
- * (docs/DESIGN.md §3.4). One visual language for section cards, status
- * chips, quick-action tiles, result blocks, passphrase inputs, headers,
- * busy rows, notice banners, labeled switch rows and avatars.
+ * Shared building blocks — v1.4.0 "Liquid Glass": the v0.5 "Calm Vault"
+ * component set re-expressed as glass. Same names, same call signatures,
+ * same a11y contract (state = icon + color, never color alone; interactive
+ * targets ≥ 48dp; quick tiles 88dp) — the material changed, the language
+ * did not.
  *
- * v0.5 rules: grouped surfaces are TONAL (surfaceContainerLow), never
- * bordered; state is always icon + color, never color alone; interactive
- * targets are at least 48dp (quick tiles 88dp).
+ * The glass rules (see theme/Glass.kt): every surface is the ONE
+ * [glassSurface] chain (tint + specular bevel + refraction rim) over the
+ * quiet two-tone backdrop; corner radii come from [GlassRadii]; text keeps
+ * its Material-role on-color so contrast never depends on the backdrop;
+ * motion is spring-based and subtle (no continuous animation).
  */
 
 /**
- * Titled tonal card group used by every screen.
+ * Titled glass card group used by every screen.
  *
- * v0.5: `surfaceContainerLow` fill with the medium (16dp) shape replaces
- * the v0.4.2 outlined border — the Material 3 role-system way to express
- * grouping; the optional [icon] leads the title in the primary color.
+ * v1.4.0: the tonal container becomes a glass panel — [glassSurface] with
+ * the card radius, the title's leading icon still in the primary color.
+ * Signature and semantics unchanged from v0.5.
  */
 @Composable
 fun SectionCard(
@@ -70,10 +86,11 @@ fun SectionCard(
     icon: ImageVector? = null,
     content: @Composable () -> Unit,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = MaterialTheme.shapes.medium,
-        modifier = modifier.fillMaxWidth(),
+    val glass = LocalGlassTokens.current
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .glassSurface(glass, RoundedCornerShape(GlassRadii.card)),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -101,10 +118,11 @@ fun SectionCard(
 /**
  * Status pill ("Unlocked: 2" / "Contacts: 0").
  *
- * v0.5: a full pill with an optional leading icon. Positive states use
- * the SUCCESS semantic extension (the vault-app "unlocked = green"
- * channel); everything else stays slate `secondaryContainer`. State is
- * readable from the icon alone, never from color alone.
+ * v1.4.0: a glass pill — the chip-radius [glassSurface] — with the state
+ * inset as a solid tonal dot area: a small SUCCESS/secondary container
+ * circle behind the leading icon keeps the state readable from icon +
+ * color alone (never color only), while the pill itself stays neutral
+ * glass. Same signature as v0.5.
  */
 @Composable
 fun StatusChip(
@@ -114,46 +132,59 @@ fun StatusChip(
     icon: ImageVector? = null,
 ) {
     val semantic = LocalSemanticColors.current
-    val bg = if (positive) {
+    val glass = LocalGlassTokens.current
+    val stateBg = if (positive) {
         semantic.successContainer
     } else {
         MaterialTheme.colorScheme.secondaryContainer
     }
-    val fg = if (positive) {
+    val stateFg = if (positive) {
         semantic.onSuccessContainer
     } else {
         MaterialTheme.colorScheme.onSecondaryContainer
     }
-    Surface(
-        color = bg,
-        shape = RoundedCornerShape(percent = 50),
-        modifier = modifier,
+    Box(
+        modifier = modifier.glassSurface(
+            glass,
+            RoundedCornerShape(percent = 50),
+        ),
     ) {
         Row(
             modifier = Modifier.padding(start = 8.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            icon?.let {
-                Icon(it, contentDescription = null, tint = fg, modifier = Modifier.size(14.dp))
+            if (icon != null) {
+                Surface(
+                    color = stateBg,
+                    shape = CircleShape,
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = stateFg,
+                        modifier = Modifier
+                            .padding(3.dp)
+                            .size(12.dp),
+                    )
+                }
             }
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelMedium,
-                color = fg,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
 }
 
 /**
- * Quick-action tile (Home grid): 40dp tonal icon circle over a two-line
- * label, at least 88dp tall.
+ * Quick-action tile (Home grid): a glass tile with a circular medallion
+ * over a two-line label, at least 88dp tall.
  *
- * v0.5: the v0.3/v0.4 tile was an OutlinedButton row with an 18dp icon —
- * a 40dp control for the app's four primary actions. Touch target and
- * visual hierarchy now match the action's importance (docs/DESIGN.md
- * §2.6).
+ * v1.4.0: glass panel (card radius) + a primary-tinted medallion; the
+ * press feedback is a spring SCALE (0.97f) — a physical "glass gives"
+ * press instead of ripple-only. Touch target and hierarchy unchanged.
  */
 @Composable
 fun QuickActionTile(
@@ -163,14 +194,36 @@ fun QuickActionTile(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = MaterialTheme.shapes.medium,
+    val glass = LocalGlassTokens.current
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 400f),
+        label = "tilePress",
+    )
+    val shape = RoundedCornerShape(GlassRadii.card)
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 88.dp),
+            .heightIn(min = 88.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .glassSurface(glass, shape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled,
+                onClick = onClick,
+            )
+            .pointerInput(enabled) {
+                awaitEachGesture {
+                    pressed = true
+                    waitForUpOrCancellation()
+                    pressed = false
+                }
+            },
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
@@ -201,13 +254,13 @@ fun QuickActionTile(
 }
 
 /**
- * Shared empty-state block — icon + title + body on a quiet tonal
- * surface, centered, with an optional call to action.
+ * Shared empty-state block — icon + title + body on a quiet glass panel,
+ * centered, with an optional call to action.
  *
- * v0.5: the CTA. An empty state is where new users land first; NN/g's
- * three jobs for it are status, education and a DIRECT pathway
- * (docs/DESIGN.md §2.4) — "Add contact" belongs on the empty Contacts
- * screen, not a dead end.
+ * v1.4.0: glass panel; the icon sits in a frosted medallion (tintHigh)
+ * so the glyph's outline color reads on both modes. CTA contract from
+ * v0.5 unchanged — an empty state is where new users land first, and the
+ * direct pathway stays.
  */
 @Composable
 fun EmptyState(
@@ -218,22 +271,30 @@ fun EmptyState(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = MaterialTheme.shapes.medium,
-        modifier = modifier.fillMaxWidth(),
+    val glass = LocalGlassTokens.current
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .glassSurface(glass, RoundedCornerShape(GlassRadii.card)),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.size(32.dp),
-                tint = MaterialTheme.colorScheme.outline,
-            )
+            Surface(
+                color = glass.tintHigh,
+                shape = CircleShape,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .size(28.dp),
+                    tint = MaterialTheme.colorScheme.outline,
+                )
+            }
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium,
@@ -259,9 +320,10 @@ fun EmptyState(
 /**
  * Read-only result block (envelope or plaintext) with copy/clear row.
  *
- * v0.5: the text sits on a `surfaceContainerHigh` inset inside its
- * `surfaceContainerLow` section card — tonal layering instead of nothing,
- * monospace envelopes render in bodySmall.
+ * v1.4.0: the inset becomes a raised glass layer (tintHigh at the field
+ * radius) — one glass over another is the Liquid Glass depth cue that
+ * replaced the v0.5 tonal tier. Monospace envelopes still render in
+ * bodySmall; buttons keep the 48dp row.
  */
 @Composable
 fun ResultBlock(
@@ -271,11 +333,12 @@ fun ResultBlock(
     onCopy: () -> Unit,
     onClear: () -> Unit,
 ) {
+    val glass = LocalGlassTokens.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth(),
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .glassSurface(glass, RoundedCornerShape(GlassRadii.field), tint = glass.tintHigh),
         ) {
             SelectionContainer {
                 Text(
@@ -286,6 +349,7 @@ fun ResultBlock(
                         MaterialTheme.typography.bodyLarge
                     },
                     modifier = Modifier.padding(12.dp),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -497,10 +561,11 @@ enum class NoticeTone { INFO, SUCCESS, WARNING, ERROR }
 /**
  * Inline notice banner for typed notices.
  *
- * v0.4.2 made it a real banner (errorContainer surface); v0.5 adds tones
- * so confirmations (copied, created, unlocked) stop reading as errors.
- * The default stays ERROR — that is what a raw notice has always meant
- * at the existing call sites.
+ * v1.4.0: glass banner (chip radius) + a solid TONAL STATE INSET — the
+ * icon sits in a filled circle of the tone's container color. The four
+ * tones (INFO/SUCCESS/WARNING/ERROR) keep their v0.5 semantic mapping and
+ * remain readable from icon + tone, never tone alone; default stays
+ * ERROR (what a raw notice has always meant at existing call sites).
  */
 @Composable
 fun NoticeBanner(
@@ -512,7 +577,8 @@ fun NoticeBanner(
         stringResourceCompat(notice.res, arg)
     } ?: stringResourceCompat(notice.res)
     val semantic = LocalSemanticColors.current
-    val (bg, fg, icon) = when (tone) {
+    val glass = LocalGlassTokens.current
+    val (insetBg, insetFg, icon) = when (tone) {
         NoticeTone.INFO -> Triple(
             MaterialTheme.colorScheme.secondaryContainer,
             MaterialTheme.colorScheme.onSecondaryContainer,
@@ -534,21 +600,30 @@ fun NoticeBanner(
             TurnyptIcons.Warning,
         )
     }
-    Surface(
-        color = bg,
-        contentColor = fg,
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth(),
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassSurface(glass, RoundedCornerShape(GlassRadii.chip)),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+            Surface(color = insetBg, shape = CircleShape) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = insetFg,
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .size(14.dp),
+                )
+            }
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -560,6 +635,10 @@ fun NoticeBanner(
  * literal text "On"/"Off" next to the switch, which read as a status
  * display instead of the feature's name; a control must be labeled by
  * what it controls.
+ *
+ * v1.4.0: the switch sits in a pill-shaped raised-glass well (tintHigh,
+ * chip radius) — the Liquid Glass take on an inset control plate. The row
+ * keeps its ≥48dp target and labels.
  */
 @Composable
 fun SettingSwitchRow(
@@ -569,6 +648,7 @@ fun SettingSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     subtitle: String? = null,
 ) {
+    val glass = LocalGlassTokens.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -586,13 +666,28 @@ fun SettingSwitchRow(
                 )
             }
         }
-        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
+        Box(
+            modifier = Modifier
+                .glassSurface(
+                    glass,
+                    RoundedCornerShape(GlassRadii.chip),
+                    tint = glass.tintHigh,
+                )
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
+            Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
+        }
     }
 }
 
 /**
  * v0.5: contact avatar — the contact's initial on a tonal circle, green
  * when unlocked (the SUCCESS channel), quiet grey when locked.
+ *
+ * v1.4.0: the circle becomes a glass medallion: the glass tint over a
+ * SOLID state under-fill (unlocked keeps its unmistakable green channel —
+ * state color must not shift with the backdrop), locked stays neutral
+ * glass. Same 40dp size and reading.
  */
 @Composable
 fun ContactAvatar(
@@ -601,12 +696,14 @@ fun ContactAvatar(
     modifier: Modifier = Modifier,
 ) {
     val semantic = LocalSemanticColors.current
-    val bg = if (unlocked) semantic.successContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+    val glass = LocalGlassTokens.current
+    val stateFill = if (unlocked) semantic.successContainer else glass.tintHigh
     val fg = if (unlocked) semantic.onSuccessContainer else MaterialTheme.colorScheme.onSurfaceVariant
-    Surface(
-        color = bg,
-        shape = CircleShape,
-        modifier = modifier.size(40.dp),
+    Box(
+        modifier = modifier
+            .size(40.dp)
+            .background(stateFill, CircleShape)
+            .glassSurface(glass, CircleShape, tint = glass.tint.copy(alpha = glass.tint.alpha * 0.45f)),
     ) {
         Text(
             text = name.trim().take(1).uppercase(),
@@ -698,11 +795,12 @@ private fun ClipboardHistoryRow(
     onUse: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Surface(
-        onClick = onUse,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth(),
+    val glass = LocalGlassTokens.current
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassSurface(glass, RoundedCornerShape(GlassRadii.chip), tint = glass.tintHigh)
+            .clickable(onClick = onUse),
     ) {
         Row(
             verticalAlignment = Alignment.Top,
@@ -722,6 +820,7 @@ private fun ClipboardHistoryRow(
                     },
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

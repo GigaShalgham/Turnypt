@@ -194,8 +194,9 @@ TNS1 invites (legacy `CK1:`/`CKS1:` still decode) are specified in
 - [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) — where the selection
   toolbar / sharesheet entries appear per messenger, and the clipboard
   flows for everywhere else
-- [`docs/DESIGN.md`](docs/DESIGN.md) — the v0.5 design research and the
-  "Calm Vault" design system
+- [`docs/DESIGN.md`](docs/DESIGN.md) — the v0.5 design research, the
+  "Calm Vault" design system, and the v1.4.0 Liquid Glass pass (tokens,
+  glass material model, contrast audit)
 - [`docs/PLUGINS.md`](docs/PLUGINS.md) — public-key plugin API (Mode B)
 - [`docs/DEEP-SCAN-*.md`](docs/) — dated security self-audit reports
 - [`CHANGELOG.md`](CHANGELOG.md) — version history

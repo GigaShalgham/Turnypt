@@ -9,6 +9,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-17 — Liquid Glass redesign
+
+A complete visual redesign of every surface in Apple's **Liquid Glass**
+design language (the iOS 26 aesthetic): translucent glass surfaces with
+real depth, floating rounded navigation, pill-shaped controls, specular
+highlights and refraction rims, spring-based motion — with every
+existing feature, flow, and behaviour preserved untouched.
+
+### Added — the Liquid Glass system (`ui/theme/Glass.kt`)
+
+- **Design tokens, not per-screen styling**: `GlassColors` (tint, raised
+  tint, refraction border, specular highlight, nav tint, two-tone
+  backdrop) provided adaptively for light (frost) and dark (night) via
+  `LocalGlassTokens`; one `glassSurface` modifier assembles every glass
+  panel (tint → bevel → rim); `GlassRadii` defines the single corner
+  family (12/16/20/28 + pill). Screens consume tokens; nothing
+  hand-rolls translucency.
+- **Native window blur** for the translucent companion sheets:
+  `Window.setBackgroundBlurRadius` (API 31+, compositor-side — no
+  per-frame shader, no new dependency) makes the calling app genuinely
+  read as frosted depth behind the sheet; below 31 the dimmed scrim
+  continues as before.
+
+### Changed — every surface, one language
+
+- **Floating navigation bar**: the docked `NavigationBar` becomes a
+  floating glass pill over edge-to-edge content — five ≥48dp slots, a
+  spring-animated selection pill sliding between them, the active icon
+  settling a hair larger. Same routes, same base-route selection logic
+  (the v1.2.0 fix), same deep-link retap behaviour.
+- **Components**: SectionCards, ContactCards, EmptyStates, ResultBlocks,
+  NoticeBanners, quick-action tiles, cipher chips, picked-file rows,
+  clipboard-history rows and settings rows are all glass panels now;
+  state (unlocked/warning/error) renders as solid tonal insets ON the
+  glass — the SUCCESS/ochre/error channels never fade with the backdrop.
+  The Text|Image segment switch is a glass segmented control with a
+  sliding indicator; Home carries a glass hero; the decrypt preview and
+  incoming drafts rest on raised glass plates.
+- **The floating assistant** (classic Views): night-glass bubble and
+  panel with light rims, glass-row wells, and a restrained 160 ms
+  scale+fade expand (was an instant visibility flip).
+- **Motion**: springs tuned small (no overshoot clipping), no continuous
+  or looping animation anywhere; nothing animates per-frame.
+- **Palette**: surfaces cool one step (light) / deepen one step (dark)
+  so glass reads as a LAYER, not a match; brand primary, Vazirmatn
+  typography and all semantic pairs unchanged.
+
+### Preserved (the redesign contract)
+
+- All functionality, crypto, flows, dialogs, clipboard history,
+  biometrics, custom file extension, navigation behaviour and Persian
+  translation — untouched (a visual layer, not a feature rewrite).
+- Accessibility: every text-on-glass pair audited numerically at both
+  backdrop bounds — worst case 6.40:1, all ≥ WCAG AA 4.5:1; touch targets
+  unchanged (≥48dp, tiles 88dp); state still icon + color, never color
+  alone; FLAG_SECURE untouched.
+- Performance: no per-frame blur in-app (only the single platform window
+  blur on translucent sheets), no new dependencies, token-level reuse
+  instead of duplicated styling.
+
 ## [1.3.2] - 2026-11-17 — custom file extension (off by default)
 
 User request: "add an option in setting named Custom file extention and

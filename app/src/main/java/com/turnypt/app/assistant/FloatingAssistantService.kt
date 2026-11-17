@@ -19,6 +19,8 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.animation.AccelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -158,12 +160,15 @@ class FloatingAssistantService : Service() {
             y = (220 * density).toInt()
         }
 
-        // The collapsed bubble.
+        // The collapsed bubble — v1.4.0 Liquid Glass: the brand aubergine
+        // deepens to the night-glass tone with a light rim stroke, so the
+        // circle reads as a glass bead, not a flat disc.
         val bubbleView = ImageView(this).apply {
             setImageResource(R.drawable.ic_assistant_lock)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.argb(242, 46, 58, 120))
+                setColor(Color.argb(238, 30, 34, 54))
+                setStroke((1 * density).toInt(), Color.argb(96, 255, 255, 255))
             }
             layoutParams = FrameLayout.LayoutParams(
                 (48 * density).toInt(),
@@ -189,13 +194,20 @@ class FloatingAssistantService : Service() {
         panel = panelView
     }
 
-    /** Vertical action panel — header with ✕, labeled rows, hint footer. */
+    /** Vertical action panel — header with ✕, labeled rows, hint footer.
+     *
+     * v1.4.0 Liquid Glass: the panel is the dark-glass material — deeper
+     * translucency, a 26dp radius, a light refraction rim, and the rows
+     * ripple over quiet wells instead of a flat plate. The expand/collapse
+     * now animates (scale + fade, 160ms — restrained).
+     */
     private fun buildPanel(density: Float): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
-                cornerRadius = 22 * density
-                setColor(Color.argb(244, 23, 26, 36))
+                cornerRadius = 26 * density
+                setColor(Color.argb(236, 22, 25, 38))
+                setStroke((1 * density).toInt(), Color.argb(64, 255, 255, 255))
             }
             val hPad = (6 * density).toInt()
             val vPad = (10 * density).toInt()
@@ -351,8 +363,10 @@ class FloatingAssistantService : Service() {
             background = RippleDrawable(
                 rippleColor,
                 GradientDrawable().apply {
-                    cornerRadius = 16 * density
-                    setColor(Color.TRANSPARENT)
+                    // v1.4.0: row wells at the glass chip radius — the
+                    // rows read as inset plates in the panel glass.
+                    cornerRadius = 18 * density
+                    setColor(Color.argb(26, 255, 255, 255))
                 },
                 null,
             )
@@ -442,14 +456,39 @@ class FloatingAssistantService : Service() {
         val panelView = panel ?: return
         val wasExpanded = expanded
         expanded = !wasExpanded
-        bubbleView.visibility = if (expanded) View.GONE else View.VISIBLE
-        panelView.visibility = if (expanded) View.VISIBLE else View.GONE
+        if (expanded) {
+            // v1.4.0: Liquid Glass arrival — the panel scales up from the
+            // bubble's footprint with a fade (160ms, restrained; a quick
+            // decelerate curve reads as physical, not springy-cute).
+            panelView.alpha = 0f
+            panelView.scaleX = 0.9f
+            panelView.scaleY = 0.9f
+            bubbleView.visibility = View.GONE
+            panelView.visibility = View.VISIBLE
+            panelView.pivotX = panelView.width / 2f
+            panelView.pivotY = 0f
+            panelView.animate()
+                .alpha(1f).scaleX(1f).scaleY(1f)
+                .setDuration(160)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+        } else {
+            panelView.animate()
+                .alpha(0f).scaleX(0.92f).scaleY(0.92f)
+                .setDuration(140)
+                .setInterpolator(AccelerateInterpolator())
+                .withEndAction {
+                    panelView.visibility = View.GONE
+                    bubbleView.visibility = View.VISIBLE
+                }
+                .start()
+        }
     }
 
     private fun collapsePanel() {
         expanded = false
-        bubble?.visibility = View.VISIBLE
         panel?.visibility = View.GONE
+        bubble?.visibility = View.VISIBLE
     }
 
     // ------------------------------------------------------------ actions

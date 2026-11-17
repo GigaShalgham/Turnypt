@@ -3,11 +3,14 @@ package com.turnypt.app.ui
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -48,6 +51,9 @@ import com.turnypt.app.companion.UiNotice
 import com.turnypt.core.crypto.CipherAlgorithm
 import com.turnypt.data.preferences.CipherPreference
 import com.turnypt.data.preferences.CustomFileExtension
+import com.turnypt.app.ui.theme.GlassRadii
+import com.turnypt.app.ui.theme.LocalGlassTokens
+import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.security.policies.Argon2Profile
 import com.turnypt.security.policies.KeyPolicy
 
@@ -303,11 +309,18 @@ fun SettingsScreen(
                 CipherPreference.CHACHA20_POLY1305 -> stringResource(R.string.cipher_pref_chacha)
             }
             var cipherDialogOpen by remember { mutableStateOf(false) }
-            Surface(
-                onClick = { cipherDialogOpen = true },
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.fillMaxWidth(),
+            // v1.4.0: the preference row reads as a raised glass plate
+            // (tintHigh) — one tap target, same dialog behind it.
+            val glass = LocalGlassTokens.current
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .glassSurface(
+                        glass,
+                        RoundedCornerShape(GlassRadii.field),
+                        tint = glass.tintHigh,
+                    )
+                    .clickable(onClick = { cipherDialogOpen = true }),
             ) {
                 Column(
                     modifier = Modifier.padding(12.dp),
@@ -316,6 +329,7 @@ fun SettingsScreen(
                     Text(
                         cipherPreferenceLabel,
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         stringResource(R.string.settings_cipher_summary),

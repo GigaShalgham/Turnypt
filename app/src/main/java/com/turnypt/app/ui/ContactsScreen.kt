@@ -1,7 +1,9 @@
 package com.turnypt.app.ui
 
 import android.content.Intent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -51,6 +54,9 @@ import com.turnypt.app.companion.UiNotice
 import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.security.BiometricPromptHost
 import com.turnypt.app.security.rememberBiometricPromptHelper
+import com.turnypt.app.ui.theme.GlassRadii
+import com.turnypt.app.ui.theme.LocalGlassTokens
+import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.data.repository.Contact
 import com.turnypt.data.repository.UnlockOutcome
 import com.turnypt.security.policies.Argon2Profile
@@ -205,6 +211,10 @@ fun ContactsScreen(viewModel: ContactsViewModel, biometrics: BiometricKeyStore) 
  * v0.5: avatar card — the contact's initial on a tonal circle (green when
  * unlocked), name + era line, and a leading-icon state pill at the end.
  * Grouping is tonal (surfaceContainerLow), consistent with SectionCard.
+ *
+ * v1.4.0: the card IS glass now — [glassSurface] at the card radius with
+ * the same tap behaviour; the avatar medallion and state pill keep their
+ * own channels on top of it.
  */
 @Composable
 private fun ContactCard(
@@ -213,11 +223,12 @@ private fun ContactCard(
     eraCount: Int,
     onClick: () -> Unit,
 ) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+    val glass = LocalGlassTokens.current
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassSurface(glass, RoundedCornerShape(GlassRadii.card))
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier

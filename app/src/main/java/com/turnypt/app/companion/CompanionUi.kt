@@ -1,6 +1,7 @@
 package com.turnypt.app.companion
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -43,6 +45,9 @@ import androidx.compose.ui.unit.sp
 import com.turnypt.app.R
 import com.turnypt.app.ui.PassphraseStrengthHint
 import com.turnypt.app.ui.SuggestPassphraseSection
+import com.turnypt.app.ui.theme.GlassRadii
+import com.turnypt.app.ui.theme.LocalGlassTokens
+import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.app.security.rememberBiometricPromptHelper
 import com.turnypt.app.security.BiometricPromptHost
 import com.turnypt.core.common.ContactId
@@ -223,16 +228,30 @@ private fun EncryptPrepareCard(
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
-            text = state.incoming ?: "",
-            fontSize = 15.sp,
-            maxLines = 4,
-            overflow = TextOverflow.Ellipsis,
+        // v1.4.0: the incoming draft rests on a raised glass plate —
+        // selectable, bounded, depth over the sheet's own glass.
+        val glass = LocalGlassTokens.current
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
-                .heightIn(max = 120.dp),
-        )
+                .glassSurface(
+                    glass,
+                    RoundedCornerShape(GlassRadii.field),
+                    tint = glass.tintHigh,
+                ),
+        ) {
+            Text(
+                text = state.incoming ?: "",
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+                    .heightIn(max = 120.dp),
+            )
+        }
 
         ContactDropdown(
             contacts = state.contacts,
