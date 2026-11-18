@@ -15,8 +15,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -25,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,6 +43,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.cipherkey.app.ContactsViewModel
 import org.cipherkey.app.R
@@ -51,6 +51,8 @@ import org.cipherkey.app.companion.UiNotice
 import org.cipherkey.app.security.BiometricKeyStore
 import org.cipherkey.app.security.BiometricPromptHost
 import org.cipherkey.app.security.rememberBiometricPromptHelper
+import org.cipherkey.app.ui.theme.LocalFrostedColors
+import org.cipherkey.app.ui.theme.frostedPane
 import org.cipherkey.data.repository.Contact
 import org.cipherkey.data.repository.UnlockOutcome
 import org.cipherkey.security.policies.Argon2Profile
@@ -202,9 +204,10 @@ fun ContactsScreen(viewModel: ContactsViewModel, biometrics: BiometricKeyStore) 
 }
 
 /**
- * v0.5: avatar card — the contact's initial on a tonal circle (green when
+ * v0.5.3: avatar card — the contact's initial on a tonal circle (green when
  * unlocked), name + era line, and a leading-icon state pill at the end.
- * Grouping is tonal (surfaceContainerLow), consistent with SectionCard.
+ * Grouping is the frosted pane, consistent with SectionCard ("Frosted
+ * Vault": one glass system across the app).
  */
 @Composable
 private fun ContactCard(
@@ -213,11 +216,14 @@ private fun ContactCard(
     eraCount: Int,
     onClick: () -> Unit,
 ) {
-    Card(
+    Surface(
         onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+        color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .frostedPane(),
     ) {
         Row(
             modifier = Modifier
@@ -367,6 +373,9 @@ private fun AddContactDialog(
                 Text(stringResource(R.string.cancel))
             }
         },
+        // v0.5.3 "Frosted Vault": the new-contact dialog is a glass pane —
+        // the frosted tint as its container color, matching every card.
+        containerColor = LocalFrostedColors.current.paneTint,
     )
 }
 
@@ -645,5 +654,9 @@ private fun ContactDetailDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
         },
+        // v0.5.3 "Frosted Vault": the detail dialog is a glass pane too —
+        // the frosted tint as its container color (same material, same
+        // tone, drawn by the dialog frame itself).
+        containerColor = LocalFrostedColors.current.paneTint,
     )
 }

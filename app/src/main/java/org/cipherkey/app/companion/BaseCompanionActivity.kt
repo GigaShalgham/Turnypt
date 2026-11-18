@@ -71,6 +71,20 @@ abstract class BaseCompanionActivity : FragmentActivity() {
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE,
         )
+        // v0.5.3 "Frosted Vault": this sheet floats over the calling
+        // app's pixels, so it earns the real backdrop blur where the
+        // platform offers it (S+): the messenger's content behind the
+        // translucent sheet frosts instead of dimming flat. Below S the
+        // plain backgroundDim stays — no fake frost.
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            window.attributes = window.attributes.apply {
+                setBlurBehindRadius( /* density-scaled */ 26f
+                    .times(resources.displayMetrics.density)
+                    .toInt()
+                )
+            }
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        }
         if (savedInstanceState == null) {
             if (isClipboardLaunch(intent)) {
                 // Do NOT read the clipboard here: the window has no focus

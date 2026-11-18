@@ -186,6 +186,7 @@ fun CipherKeyTheme(
     ) {
         CompositionLocalProvider(
             LocalSemanticColors provides if (darkTheme) DarkSemantic else LightSemantic,
+            LocalFrostedColors provides if (darkTheme) DarkFrosted else LightFrosted,
         ) {
             content()
         }

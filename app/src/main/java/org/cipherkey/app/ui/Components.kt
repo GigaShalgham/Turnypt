@@ -40,9 +40,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import org.cipherkey.app.R
 import org.cipherkey.app.companion.UiNotice
+import org.cipherkey.app.ui.theme.LocalFrostedColors
 import org.cipherkey.app.ui.theme.LocalSemanticColors
+import org.cipherkey.app.ui.theme.frostedPane
 import org.cipherkey.security.policies.PassphraseAdvisor
 
 /**
@@ -57,11 +60,12 @@ import org.cipherkey.security.policies.PassphraseAdvisor
  */
 
 /**
- * Titled tonal card group used by every screen.
+ * Titled frosted card group used by every screen.
  *
- * v0.5: `surfaceContainerLow` fill with the medium (16dp) shape replaces
- * the v0.4.2 outlined border — the Material 3 role-system way to express
- * grouping; the optional [icon] leads the title in the primary color.
+ * v0.5.3: the group surface is now a frosted-glass pane (translucent
+ * tint + sheen + hairline edge, docs/DESIGN.md "Frosted Vault") — same
+ * medium shape and grouping role as the v0.5 tonal card; the optional
+ * [icon] still leads the title in the primary color.
  */
 @Composable
 fun SectionCard(
@@ -71,9 +75,12 @@ fun SectionCard(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .frostedPane(),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -150,10 +157,9 @@ fun StatusChip(
  * Quick-action tile (Home grid): 40dp tonal icon circle over a two-line
  * label, at least 88dp tall.
  *
- * v0.5: the v0.3/v0.4 tile was an OutlinedButton row with an 18dp icon —
- * a 40dp control for the app's four primary actions. Touch target and
- * visual hierarchy now match the action's importance (docs/DESIGN.md
- * §2.6).
+ * v0.5.3: the tile body is a frosted pane over the transparent Surface;
+ * the icon circle keeps its saturated primaryContainer — it is the
+ * action affordance, not glass.
  */
 @Composable
 fun QuickActionTile(
@@ -166,11 +172,13 @@ fun QuickActionTile(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 88.dp),
+            .heightIn(min = 88.dp)
+            .frostedPane(),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
@@ -201,13 +209,12 @@ fun QuickActionTile(
 }
 
 /**
- * Shared empty-state block — icon + title + body on a quiet tonal
- * surface, centered, with an optional call to action.
+ * Shared empty-state block — icon + title + body on a quiet frosted
+ * pane, centered, with an optional call to action.
  *
- * v0.5: the CTA. An empty state is where new users land first; NN/g's
- * three jobs for it are status, education and a DIRECT pathway
- * (docs/DESIGN.md §2.4) — "Add contact" belongs on the empty Contacts
- * screen, not a dead end.
+ * v0.5.3: frosted pane (same glass system as every card); the CTA
+ * argument is unchanged — an empty state is still where new users
+ * land first (docs/DESIGN.md §2.4).
  */
 @Composable
 fun EmptyState(
@@ -219,9 +226,12 @@ fun EmptyState(
     onAction: (() -> Unit)? = null,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .frostedPane(),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
@@ -259,9 +269,9 @@ fun EmptyState(
 /**
  * Read-only result block (envelope or plaintext) with copy/clear row.
  *
- * v0.5: the text sits on a `surfaceContainerHigh` inset inside its
- * `surfaceContainerLow` section card — tonal layering instead of nothing,
- * monospace envelopes render in bodySmall.
+ * v0.5.3: the inset pane under the text is the quieter frosted glass
+ * (insetTint) inside its frosted section card — glass layering instead
+ * of tonal layering; monospace envelopes render in bodySmall.
  */
 @Composable
 fun ResultBlock(
@@ -273,9 +283,12 @@ fun ResultBlock(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .frostedPane(LocalFrostedColors.current.insetTint),
         ) {
             SelectionContainer {
                 Text(
@@ -642,6 +655,9 @@ fun ClipboardHistoryDialog(
 ) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
+        // v0.5.3 "Frosted Vault": the history dialog is a glass pane —
+        // the frosted tint as its container color, matching every card.
+        containerColor = LocalFrostedColors.current.paneTint,
         title = { Text(stringResourceCompat(R.string.clipboard_history_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -691,7 +707,9 @@ fun ClipboardHistoryDialog(
     )
 }
 
-/** One history row: bounded preview, age + CK1 + truncated meta, ✕ delete. */
+/** One history row: bounded preview, age + CK1 + truncated meta, ✕ delete.
+ *
+ * v0.5.3: the row is the quieter frosted inset pane. */
 @Composable
 private fun ClipboardHistoryRow(
     entry: org.cipherkey.data.repository.ClipboardHistoryEntry,
@@ -700,9 +718,12 @@ private fun ClipboardHistoryRow(
 ) {
     Surface(
         onClick = onUse,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .frostedPane(LocalFrostedColors.current.insetTint),
     ) {
         Row(
             verticalAlignment = Alignment.Top,

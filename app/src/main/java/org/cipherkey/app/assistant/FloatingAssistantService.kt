@@ -135,6 +135,15 @@ class FloatingAssistantService : Service() {
             gravity = Gravity.TOP or Gravity.START
             x = pad
             y = (220 * density).toInt()
+            // v0.5.3 "Frosted Vault": the assistant floats over OTHER
+            // apps' pixels, so it earns the real backdrop blur where the
+            // platform offers it (S+); behind the translucent panel the
+            // messenger's content frosts instead of showing raw. The
+            // panel alpha drops to ~88% so the frost reads through.
+            // Below S: plain translucent glass, unchanged — no fake frost.
+            if (Build.VERSION.SDK_INT >= 31) {
+                setBlurBehindRadius((22 * density).toInt())
+            }
         }
 
         // The collapsed bubble.
@@ -168,13 +177,16 @@ class FloatingAssistantService : Service() {
         panel = panelView
     }
 
-    /** Vertical action panel — header with ✕, labeled rows, hint footer. */
+    /** Vertical action panel — header with ✕, labeled rows, hint footer.
+     *
+     * v0.5.3: frosted-glass panel — translucent fill (the window's
+     * blur-behind does the frost on S+), 22dp corners kept. */
     private fun buildPanel(density: Float): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 cornerRadius = 22 * density
-                setColor(Color.argb(244, 23, 26, 36))
+                setColor(Color.argb(225, 23, 26, 36))
             }
             val hPad = (6 * density).toInt()
             val vPad = (10 * density).toInt()

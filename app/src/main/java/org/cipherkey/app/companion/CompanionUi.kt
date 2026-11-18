@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.sp
 import org.cipherkey.app.R
 import org.cipherkey.app.ui.PassphraseStrengthHint
 import org.cipherkey.app.ui.SuggestPassphraseSection
+import org.cipherkey.app.ui.theme.LocalFrostedColors
+import org.cipherkey.app.ui.theme.frostedPane
 import org.cipherkey.app.security.rememberBiometricPromptHelper
 import org.cipherkey.app.security.BiometricPromptHost
 import org.cipherkey.core.common.ContactId
@@ -437,9 +439,12 @@ private fun ResultCard(
                 fontFamily = if (state.mode == CompanionMode.ENCRYPT) FontFamily.Monospace else FontFamily.Default,
                 maxLines = if (state.mode == CompanionMode.ENCRYPT) 6 else Int.MAX_VALUE,
                 overflow = TextOverflow.Ellipsis,
+                // v0.5.3 "Frosted Vault": the result text sits on the same
+                // quieter frosted inset pane as the main-screen ResultBlock.
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 320.dp)
+                    .frostedPane(LocalFrostedColors.current.insetTint)
                     .verticalScroll(rememberScrollState())
                     .padding(12.dp),
             )

@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3-alpha] - 2026-11-18 — Frosted Vault (prerelease)
+
+### Replace every standard glass element with a consistent frosted glass
+
+User request, applied app-wide as one design system ("Frosted Vault"):
+every neutral glass surface in the app now renders as the SAME frosted
+material, replacing the v0.5 flat tonal fills.
+
+**What changed, by layer:**
+
+1. **One frosted token set** (`ui/theme/Frost.kt`, provided through the
+   theme like every other v0.5 token): a translucent pane tint (the
+   v0.5 role colors at ~70% alpha — the app's own background tones
+   breathe through every pane), a quieter inset tint for nested
+   surfaces, a brighter sheen band at each pane's top edge (the
+   light-catching-frost cue), and a hairline top edge. Dark and light
+   variants, both registered in `CipherKeyTheme`.
+2. **Every in-app pane wears it**: SectionCard, QuickActionTile,
+   EmptyState, ResultBlock (inset pane), ContactCard, the clipboard
+   history rows (inset), the two Contacts dialogs and the clipboard
+   history dialog (frosted container color), and the companion sheet's
+   result pane. One modifier — `Modifier.frostedPane()` — no surface
+   keeps its own recipe.
+3. **The two surfaces that float over OTHER apps' pixels got a REAL
+   backdrop blur** (API 31+): the companion encrypt/decrypt sheet
+   (WindowManager blur-behind, 26dp) and the floating assistant overlay
+   (22dp) — the calling app's content actually frosts behind the
+   translucent glass instead of showing raw. Below Android 12 there is
+   no honest blur, so those surfaces keep the plain translucent glass —
+   no fake frost.
+4. **What deliberately did NOT frost**: the security-state containers
+   (success/error/warning fills, StatusChip, NoticeBanner, avatars).
+   State must stay readable at a glance; frost is for neutral panes only.
+
+Full test matrix: 361 tests, 0 failures.
+
 ## [0.5.2-alpha] - 2026-11-07 — clipboard history, panel close, passphrase suggestion
 
 Three clarifications from the same user who reported the v0.5.1 batch.
