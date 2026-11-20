@@ -12,6 +12,9 @@
     <string name="nav_home">خانه</string>
     <string name="nav_encrypt">رمزنگاری</string>
     <string name="nav_decrypt">رمزگشایی</string>
+    <!-- v1.6.0-alpha.2 (درخواست کاربر): قاب استگانوگرافی به منوی اصلی
+         می‌پیوندد. «رمزنگاری پیشرفته» نام روبه‌کاربر است. -->
+    <string name="nav_advanced_crypto">رمزنگاری پیشرفته</string>
     <string name="nav_contacts">مخاطبان</string>
     <string name="nav_settings">تنظیمات</string>
 

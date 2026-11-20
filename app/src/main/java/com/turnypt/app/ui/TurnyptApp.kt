@@ -86,6 +86,13 @@ private val NavDestinations = listOf(
     Destination(DestinationRoute.HOME, R.string.nav_home, TurnyptIcons.Home),
     Destination(DestinationRoute.ENCRYPT, R.string.nav_encrypt, TurnyptIcons.Lock),
     Destination(DestinationRoute.DECRYPT, R.string.nav_decrypt, TurnyptIcons.LockOpen),
+    // v1.6.0-alpha.2 (user request): stego joins the MAIN menu as "Advanced
+    // encryption" — رمزنگاری پیشرفته. The stego plan §6.1 put the frame
+    // behind Quick Access only; the user wants it a first-class tab, so it
+    // takes the middle slot between the two plain-crypto tabs and the
+    // contacts/settings pair. Six slots stay comfortably legible at ≥48dp
+    // per tap target on the pill (label size is unchanged).
+    Destination(DestinationRoute.STEGO, R.string.nav_advanced_crypto, TurnyptIcons.Shield),
     Destination(DestinationRoute.CONTACTS, R.string.nav_contacts, TurnyptIcons.People),
     Destination(DestinationRoute.SETTINGS, R.string.nav_settings, TurnyptIcons.Settings),
 )
@@ -354,8 +361,10 @@ private fun FloatingGlassNavBar(
     val selectedIndex = destinations.indexOfFirst { selectedRoute(it) }
         .coerceAtLeast(0)
 
-    // The selection pill slides between the five slots; fraction in
-    // [0, 4]. v1.5.0 (user brief §4): critically damped (NO overshoot —
+    // The selection pill slides between the slots; fraction in
+    // [0, destinations.lastIndex] — five slots until v1.6.0-alpha.2 added
+    // the stego tab, making six. v1.5.0 (user brief §4): critically
+    // damped (NO overshoot —
     // no bounce), high stiffness — the pill lands immediately and the
     // motion stays cheap. The animated value is read ONLY inside the
     // offset/graphicsLayer lambdas (deferred state reads): a running
@@ -371,7 +380,9 @@ private fun FloatingGlassNavBar(
     // 380 with critical damping settles in ~280ms — it ARRIVES with the
     // incoming screen instead of racing it, still with zero overshoot
     // (labels never clip) and the same deferred-read structure (each
-    // frame is one layer translate; the five slots never recompose).
+    // frame is one layer translate; the slots never recompose).
+    // The target is the live index of the selected slot, so six
+    // destinations slide exactly as five did — no constants to update.
     val selectionFraction = animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
         animationSpec = spring(

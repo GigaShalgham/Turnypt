@@ -3,10 +3,16 @@
     <string name="app_name">Turnypt</string>
     <string name="tagline">Private encryption for any messenger — no servers, no accounts</string>
 
-    <!-- Main navigation (v0.3.0 five-tab layout) -->
+    <!-- Main navigation (v0.3.0 five-tab layout; v1.6.0-alpha.2 six-tab
+         with Advanced encryption) -->
     <string name="nav_home">Home</string>
     <string name="nav_encrypt">Encrypt</string>
     <string name="nav_decrypt">Decrypt</string>
+    <!-- v1.6.0-alpha.2 (user request): the stego frame joins the main
+         menu. "Advanced encryption" is the user-facing name — it will
+         grow into the steganography flows (hide/extract in carrier
+         files) as the plan's gates pass. -->
+    <string name="nav_advanced_crypto">Advanced encryption</string>
     <string name="nav_contacts">Contacts</string>
     <string name="nav_settings">Settings</string>
 
