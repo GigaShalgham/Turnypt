@@ -22,4 +22,7 @@ object DestinationRoute {
     /** v0.6.0: typed deep-link routes into the Text | Image segments. */
     const val ENCRYPT_IMAGE = "$ENCRYPT?$ARG_MODE=$MODE_IMAGE"
     const val DECRYPT_IMAGE = "$DECRYPT?$ARG_MODE=$MODE_IMAGE"
+
+    /** Stego frame (stego plan §6.1 S4): UI-only skeleton, no system yet. */
+    const val STEGO = "stego"
 }

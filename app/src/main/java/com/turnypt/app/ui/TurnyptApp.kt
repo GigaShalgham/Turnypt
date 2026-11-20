@@ -265,6 +265,12 @@ fun TurnyptApp() {
                     contactsViewModel = hiltViewModel<ContactsViewModel>(),
                 )
             }
+            // Stego frame (stego plan §6.1 S4): the UI skeleton lands
+            // first, stateless — no ViewModel until a :core:stego module
+            // clears its gates.
+            composable(DestinationRoute.STEGO) {
+                StegoScreen()
+            }
         }
 
         // The floating glass navigation bar, pinned above the content.

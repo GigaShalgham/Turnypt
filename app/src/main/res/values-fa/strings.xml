@@ -337,4 +337,26 @@
 
     <!-- ردیف دستیار شناور -->
     <string name="assistant_encrypt_image">رمزنگاری تصویر</string>
+
+    <!-- قاب استگانوگرافی (طرح §6.1 مرحله S4): اسکلت رابط کاربری،
+         بدون هیچ سامانه‌ای در پشت آن. -->
+    <string name="home_quick_stego">پنهان‌کردن در فایل</string>
+    <string name="stego_title">پنهان‌کردن در فایل</string>
+    <string name="stego_subtitle">پیام را درون یک فایل حامل استتار کنید — قابِ ویژگی استگانوگرافی پیش رو.</string>
+    <string name="stego_step_carrier">۱ · فایل حامل</string>
+    <string name="stego_carrier_hint">فایل به‌ظاهر بی‌گناهی را انتخاب کنید که پیام مخفی را حمل خواهد کرد. PNG، JPEG، WAV یا MP4.</string>
+    <string name="stego_pick_carrier">انتخاب فایل حامل</string>
+    <string name="stego_carrier_ready">حامل آماده است</string>
+    <string name="stego_step_passphrase">۲ · گذرواژه مشترک</string>
+    <string name="stego_passphrase_hint">فقط کسی که این گذرواژه را دارد می‌تواند پیام مخفی را پیدا و بخواند — آن را حضوری یا از یک کانال رمزنگاری‌شده به اشتراک بگذارید.</string>
+    <string name="stego_passphrase_label">گذرواژه</string>
+    <string name="stego_step_message">۳ · پیام مخفی</string>
+    <string name="stego_message_label">پیامی که پنهان می‌شود</string>
+    <string name="stego_embed_action">پنهان‌کردن پیام در فایل</string>
+    <string name="stego_coming_soon">پیش‌نمایش طراحی — جاسازی هنوز متصل نشده است.</string>
+    <string name="stego_preview_title">پیش‌نمایش</string>
+    <string name="stego_preview_ready">حامل %1$s آماده است</string>
+    <string name="stego_preview_explainer">نتیجه را به‌صورت «فایل/سند» بفرستید، نه عکس یا صوت یا ویدیو — پیام‌رسان‌ها رسانه را بازکدگذاری می‌کنند و پیام مخفی را نابود می‌کنند.</string>
+    <string name="stego_preview_share">هم‌رسانی</string>
+    <string name="stego_preview_reset">بستن پیش‌نمایش</string>
 </resources>

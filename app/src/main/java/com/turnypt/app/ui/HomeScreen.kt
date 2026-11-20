@@ -201,6 +201,18 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+            // Stego frame (stego plan §6.1 S4): stego takes its place in
+            // Quick Access as a design preview — the tile routes to the
+            // UI skeleton while the system behind it (S0-S3 gates) is
+            // still being built.
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                QuickActionTile(
+                    label = stringResource(R.string.home_quick_stego),
+                    icon = TurnyptIcons.Image,
+                    onClick = { onNavigate(DestinationRoute.STEGO) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
 
         // v1.5.6: the NavHost no longer cuts its viewport above the bar,
