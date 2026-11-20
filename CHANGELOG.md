@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-alpha.4] - 2026-11-20 — the blur the user asked for (prerelease)
+
+### 1. "پیشرفته" alone — no ellipsis, no shrinking
+
+The user rejected the "..." the autoSize+ellipsis produced on
+"رمزنگاری پیشرفته" / "Advanced encryption": the tab is now simply
+"Advanced" / «پیشرفته» — as short as every other slot, so the
+autoSize never kicks in and nothing is ever truncated.
+
+### 2. REAL blur — the "تار" half of the report
+
+alpha.3 made the menu opaque but left it a flat slab; the user
+stressed the blur is "very, very important". The bar now owns a
+BLURRED UNDERLAY: a swatch of the scheme's own glass tint smeared
+by a RenderEffect (Modifier.blur + BlurredEdgeTreatment, API 31+;
+below 31 it degrades to the honest frost wash), spilling ~14dp
+past the pane so the frost reads as a continuous halo wrapping
+the bar — genuine smear, not just opacity. The pane itself, its
+rim and the slot labels stay crisp on top of the frost.
+
+### 3. Refraction — the "شکست نور" half
+
+Both schemes' refraction rim strengthened (0x47 → 0x80): the
+violet edge now reads as light BENDING through the blurred pane
+against the heavier frosted tint, instead of the v1.5.0 hairline
+that vanished under alpha.3's opacity.
+
 ## [1.6.0-alpha.3] - 2026-11-20 — three user reports, one build (prerelease)
 
 ### 1. The Advanced encryption label overflowed into the walls

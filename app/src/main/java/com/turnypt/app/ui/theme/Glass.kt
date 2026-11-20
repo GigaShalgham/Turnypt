@@ -3,8 +3,11 @@ package com.turnypt.app.ui.theme
 import android.view.Window
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -12,6 +15,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -50,6 +54,13 @@ data class GlassColors(
     val highlight: Color,
     /** Tint for the floating navigation bar — the most prominent glass. */
     val navTint: Color,
+    /**
+     * v1.6.0-alpha.4: the BLURRED underlay beneath the nav pane — the
+     * user's "تار" (real blur, not just opacity). A translucent wash of
+     * the scheme's own glass colour; [glassFrost] smears it with a
+     * RenderEffect (API 31+; below 31 it stays a plain frost wash).
+     */
+    val frostTint: Color,
     /** The quiet backdrop the glass samples (light: frost, dark: night). */
     val backdropTop: Color,
     val backdropBottom: Color,
@@ -76,9 +87,17 @@ val LightGlass = GlassColors(
     // heavier tint.
     tint = Color(0xB8FFFFFF),
     tintHigh = Color(0xE8F0EAF9),
-    border = Color(0x478256C7),
+    // v1.6.0-alpha.4: the refraction rim strengthened for the frosted
+    // pane (0x47 → 0x80) — a heavier violet edge that reads as LIGHT
+    // BENDING through the blurred glass, the "شکست نور" half of the
+    // report; the blur carries the "تار" half.
+    border = Color(0x808256C7),
     highlight = Color(0x5CE8DDF9),
     navTint = Color(0xF2FFFFFF),
+    // v1.6.0-alpha.4: the light frost wash smeared under the pane —
+    // white-violet glass at the general translucency weight, so the
+    // blur's halo reads as the pane's own light, never a fog.
+    frostTint = Color(0xB8FFFFFF),
     // v1.5.5: the light backdrop is a UNIFORM warm-white field — the
     // same colour top to bottom. The old two-tone (lilac crown over
     // white foot) tinted the screen's lower region violet by design,
@@ -104,7 +123,11 @@ val DarkGlass = GlassColors(
     // (Light navTint already matches its tint and was never reported.)
     tint = Color(0x66221D33),
     tintHigh = Color(0x992A2440),
-    border = Color(0x47B18AFB),
+    // v1.6.0-alpha.4: refraction rim strengthened for the frosted pane
+    // (0x47 → 0x80) — the violet edge reads as light bending through
+    // the blur; brighter than v1.5.0's hairline because the pane itself
+    // is heavier now (0x99 wash under a 0x47 rim vanished).
+    border = Color(0x80B18AFB),
     highlight = Color(0x33B18AFB),
     // v1.5.5: a transparent bar pane must sit on a colour it does not
     // shift — the old navTint was a wash OF the backdrop's plum foot,
@@ -118,6 +141,11 @@ val DarkGlass = GlassColors(
     // enough to invite a tap through it, and the violet rim carries the
     // light-refraction character against the heavier tint.
     navTint = Color(0x9912101A),
+    // v1.6.0-alpha.4: the dark frost wash smeared under the pane —
+    // plum-neutral at the general glass weight, so the blur's halo is
+    // the pane's own smoke, not a new colour near the screen's foot
+    // (the v1.5.5 lesson).
+    frostTint = Color(0x662A2440),
     // v1.5.5: the dark backdrop is a UNIFORM near-black field top to
     // bottom — the scheme's own background (12101A). The previous
     // two-tone (0E0C15 crown over a PLUM 171522 foot) plus the v1.5.4
@@ -162,6 +190,54 @@ object GlassRadii {
     val sheetShape: RoundedCornerShape = RoundedCornerShape(sheet)
     val pillShape: RoundedCornerShape = RoundedCornerShape(pill)
 }
+
+/**
+ * REAL frosted glass for the floating navigation bar — v1.6.0-alpha.4
+ * (user report: "the glasses and the menu went opaque, but they have no
+ * refraction and no BLUR — and the blur matters to me very, very much").
+ * Opacity alone (alpha.3's heavier navTint) reads as a flat slab; the
+ * user wants the pane to actually FROST.
+ *
+ * In-app surfaces cannot sample the composited backdrop, but Compose CAN
+ * blur a layer with a RenderEffect — so the bar is restructured to own
+ * a blurred UNDERLAYER beneath its crisp pane:
+ *
+ *   Box(bar) {
+ *     Box(.glassFrost(shape, frostTint, spill))  // blurred, spills out
+ *     Box(.glassSurface(navTint)) { slots }      // crisp on top
+ *   }
+ *
+ * The underlayer is a BLURRED swatch of the scheme's own glass tint,
+ * padded outward by [spill] so the smear extends past the crisp pane's
+ * silhouette — the soft halo a real frosted edge casts. Because the
+ * RenderEffect blurs the swatch's own pixels, the spill reads as a
+ * genuine continuous haze wrapping the pane (the "تار" the user is
+ * asking for), while the pane, its rim and the slot labels stay crisp
+ * and legible on top of it.
+ *
+ * API 31+ (RenderEffect exists): Modifier.blur renders via the platform
+ * compositor (its own graphicsLayer RenderEffect — one static effect,
+ * never animated; the v1.5.0 no-per-frame-shader rule stands). Below 31
+ * Modifier.blur is a NO-OP documented by Compose itself, and the swatch
+ * keeps a plain translucent tint — the honest frosted-alpha fallback.
+ */
+fun Modifier.glassFrost(
+    shape: Shape,
+    frostTint: Color,
+    spill: Dp = 14.dp,
+    blurRadius: Dp = 10.dp,
+): Modifier = this
+    // Padded outward so the blur has real pixels to smear past the pane.
+    .padding(spill)
+    .blur(
+        radius = blurRadius,
+        edgeTreatment = BlurredEdgeTreatment(shape),
+    )
+    // Shrink back so the swatch's CLIPPED core sits under the pane and
+    // only the smeared halo extends beyond it.
+    .padding(spill)
+    .clip(shape)
+    .background(frostTint, shape)
 
 /**
  * The glass material as ONE modifier chain: clip → soft diffused shadow →

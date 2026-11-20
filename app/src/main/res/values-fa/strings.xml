@@ -13,8 +13,11 @@
     <string name="nav_encrypt">رمزنگاری</string>
     <string name="nav_decrypt">رمزگشایی</string>
     <!-- v1.6.0-alpha.2 (درخواست کاربر): قاب استگانوگرافی به منوی اصلی
-         می‌پیوندد. «رمزنگاری پیشرفته» نام روبه‌کاربر است. -->
-    <string name="nav_advanced_crypto">رمزنگاری پیشرفته</string>
+         می‌پیوندد. v1.6.0-alpha.4 (گزارش کاربر: «رمزنگاری پیشرفته» با
+         autoSize کوچک و بعد با «…» بریده می‌شود و «…» خواسته نیست):
+         برچسب فقط «پیشرفته» است — هم‌اندازه‌ی بقیه‌ی خانه‌ها، بدون
+         کوچک‌شدن و بدون بریدگی. -->
+    <string name="nav_advanced_crypto">پیشرفته</string>
     <string name="nav_contacts">مخاطبان</string>
     <string name="nav_settings">تنظیمات</string>
 

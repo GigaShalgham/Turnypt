@@ -67,6 +67,7 @@ import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.ui.theme.GlassRadii
 import com.turnypt.app.ui.theme.LocalGlassTokens
 import com.turnypt.app.ui.theme.glassBackdrop
+import com.turnypt.app.ui.theme.glassFrost
 import com.turnypt.app.ui.theme.glassSurface
 
 /**
@@ -403,12 +404,28 @@ private fun FloatingGlassNavBar(
     // wrapper BEHIND it. In v1.4.0 every child was matchParentSize — such
     // children are excluded from the parent's size resolution, so the bar
     // resolved to ZERO height and the whole navigation was invisible.
+    //
+    // v1.6.0-alpha.4 (user report: "the blur matters to me very, very
+    // much"): a matchParentSize BLURRED underlay beneath the crisp pane.
+    // The underlay is the scheme's own glass tint smeared by a RenderEffect
+    // (Modifier.blur), spilling ~14dp past the pane so the frost reads as
+    // a continuous halo wrapping the bar — REAL blur, not just opacity,
+    // on API 31+ (below 31 it degrades to the honest frosted tint).
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .glassSurface(glass, barShape, tint = glass.navTint)
             .padding(6.dp),
     ) {
+        // The blurred underlay FIRST (behind the crisp pane's children).
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .glassFrost(
+                    shape = barShape,
+                    frostTint = glass.frostTint,
+                ),
+        )
         val slotWidth = maxWidth / destinations.size
         // The sliding selection pill under the active slot's content.
         // v1.5.0 perf: the offset reads the animation INSIDE the lambda

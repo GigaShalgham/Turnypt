@@ -9,10 +9,14 @@
     <string name="nav_encrypt">Encrypt</string>
     <string name="nav_decrypt">Decrypt</string>
     <!-- v1.6.0-alpha.2 (user request): the stego frame joins the main
-         menu. "Advanced encryption" is the user-facing name — it will
-         grow into the steganography flows (hide/extract in carrier
-         files) as the plan's gates pass. -->
-    <string name="nav_advanced_crypto">Advanced encryption</string>
+         menu as the "Advanced" slot — it will grow into the
+         steganography flows (hide/extract in carrier files) as the
+         plan's gates pass.
+         v1.6.0-alpha.4 (user report: "Advanced encryption" auto-shrinks
+         then ellipsizes — the '...' is not wanted): the label is
+         "Advanced" alone, as short as every other slot, so the autoSize
+         never needs to shrink it in the first place. -->
+    <string name="nav_advanced_crypto">Advanced</string>
     <string name="nav_contacts">Contacts</string>
     <string name="nav_settings">Settings</string>
 
