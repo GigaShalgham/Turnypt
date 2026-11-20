@@ -226,9 +226,12 @@ class ToolsViewModel @Inject constructor(
      */
     private fun resyncUnlockState() {
         launchSafely {
-            val live = _state.value.contacts.map { it.id }
-                .filter { messageCipher.isUnlocked(it) }
-                .toSet()
+            // v1.5.9 (lag audit): ONE manager lock for the whole unlocked
+            // set instead of one isUnlocked() mutex acquisition per
+            // contact — this fires on every sessionChanges bump, and the
+            // per-contact loop was N serialized lock round-trips racing
+            // the three other collectors doing the same work.
+            val live = messageCipher.unlockedContactIds()
             _state.value = _state.value.copy(unlocked = live)
             // An unlock card that is on screen may have become wrong (the
             // wrap it offers could be bound to a rotated era).

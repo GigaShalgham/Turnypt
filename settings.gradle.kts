@@ -20,10 +20,13 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        google()
-        mavenCentral()
+        // v1.5.9 build note: Maven Central 429s Gradle's user-agent from
+        // this sandbox while curl succeeds — Aliyun mirrors both repos
+        // (verified 200) so it goes FIRST. Same fix the v1.8.0 build used.
         maven("https://maven.aliyun.com/repository/google")
         maven("https://maven.aliyun.com/repository/central")
+        google()
+        mavenCentral()
     }
 }
 

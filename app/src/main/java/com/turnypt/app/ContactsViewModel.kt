@@ -395,11 +395,15 @@ class ContactsViewModel @Inject constructor(
     }
 
     private suspend fun refreshUnlocked() {
-        val unlockedIds = contacts.value
-            .map { it.id }
-            .filter { messageCipher.isUnlocked(it) }
-            .toSet()
-        _unlocked.value = unlockedIds
+        // v1.5.9 (lag audit): the whole unlocked set in ONE manager lock
+        // instead of one isUnlocked() mutex acquisition per contact. This
+        // runs on every sessionChanges bump (an unlock, a lockAll, an
+        // expiry sweep) — with N contacts the old loop was N serialized
+        // lock round-trips racing the other collectors' identical loops.
+        // The resulting Set is byte-for-byte the one the loop produced.
+        val unlockedIds = messageCipher.unlockedContactIds()
+        val known = contacts.value.map { it.id }
+        _unlocked.value = known.filterTo(mutableSetOf()) { it in unlockedIds }
     }
 
     private suspend fun refreshFingerprint(contactId: ContactId) {

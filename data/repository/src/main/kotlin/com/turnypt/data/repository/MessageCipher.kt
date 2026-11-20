@@ -408,6 +408,21 @@ class MessageCipher(
 
     suspend fun isUnlocked(contactId: ContactId): Boolean = sessions.activeSession(contactId) != null
 
+    /**
+     * v1.5.9 (lag audit): the whole unlocked set in ONE manager lock.
+     *
+     * Before this, every sessionChanges bump fanned out to four
+     * ViewModels, and each recomputed its unlocked set by calling
+     * [isUnlocked] once PER CONTACT — one mutex acquisition per contact,
+     * plus (in MainViewModel) a full contacts re-read from the database
+     * per bump. An unlock with 30 contacts meant 120+ serialized lock
+     * acquisitions, each racing the very queries the other collectors
+     * were issuing; an expiry wipe DURING those checks bumped the
+     * counter again and re-triggered the whole cascade. One lock, one
+     * pass — the same live answer the per-contact calls produced.
+     */
+    suspend fun unlockedContactIds(): Set<ContactId> = sessions.unlockedContactIds()
+
     suspend fun activeSessionFingerprint(contactId: ContactId): String? =
         sessions.activeSession(contactId)?.fingerprint
 

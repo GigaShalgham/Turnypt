@@ -200,9 +200,18 @@ fun Modifier.glassSurface(
         )
 }
 
-/** The refraction rim: uniform alpha across the full surface height. */
-private fun borderBrush(glass: GlassColors): Brush =
-    Brush.verticalGradient(listOf(glass.border, glass.border))
+/**
+ * The refraction rim: uniform alpha across the full surface height.
+ *
+ * v1.5.9 (lag audit): the rim "gradient" had TWO IDENTICAL stops —
+ * [glass.border, glass.border] — a solid fill wearing a gradient's
+ * allocation cost. The v1.5.7 pass converted the tint to a SolidColor
+ * but missed this one: every glass card rebuilt the brush (and its
+ * shader on first paint) on every recomposition, and the sliding nav
+ * pill forces the glass bar to redraw at animation frequency. A solid
+ * brush paints the exact same pixels — byte-for-byte identical output.
+ */
+private fun borderBrush(glass: GlassColors): Brush = SolidColor(glass.border)
 
 /** The bevel adapts to dark glass (a white band would fog OLED black). */
 private fun highlightBrushColor(glass: GlassColors, tint: Color): Color =

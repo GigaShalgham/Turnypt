@@ -166,9 +166,14 @@ class CompanionViewModel @Inject constructor(
     private fun resyncSessionState() {
         launchSafely {
             if (_state.value.contacts.isNotEmpty()) {
-                val live = _state.value.contacts.map { it.id }
-                    .filter { messageCipher.isUnlocked(it) }
-                    .toSet()
+                // v1.5.9 (lag audit): ONE manager lock for the whole
+                // unlocked set instead of one isUnlocked() mutex
+                // acquisition per contact — this fires on every
+                // sessionChanges bump, and the per-contact loop was N
+                // serialized lock round-trips racing the three other
+                // collectors doing the same work. The v1.5.8 empty-list
+                // guard above is untouched (decrypt-flow semantics).
+                val live = messageCipher.unlockedContactIds()
                 _state.value = _state.value.copy(unlocked = live)
             } else if (_state.value.pendingContactId != null) {
                 // Decrypt flow: keep the pending contact's live state honest

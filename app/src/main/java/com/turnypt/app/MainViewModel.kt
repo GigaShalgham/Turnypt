@@ -43,10 +43,16 @@ class MainViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch(Dispatchers.IO) {
-            _contactCount.value = contactsRepository.count()
-            _unlockedCount.value = contactsRepository.observeContacts()
-                .first()
-                .count { messageCipher.isUnlocked(it.id) }
+            // v1.5.9 (lag audit): one DB read (the contact ids) and ONE
+            // session-manager lock (the whole unlocked set in a single
+            // pass) — this ran on every sessionChanges bump, and the old
+            // body did two database round-trips plus one isUnlocked()
+            // mutex acquisition PER CONTACT on each one. The counters
+            // carry the same values as before; only the traffic is gone.
+            val contacts = contactsRepository.observeContacts().first()
+            val unlockedIds = messageCipher.unlockedContactIds()
+            _contactCount.value = contacts.size
+            _unlockedCount.value = contacts.count { it.id in unlockedIds }
         }
     }
 
