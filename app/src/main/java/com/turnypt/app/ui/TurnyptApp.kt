@@ -32,6 +32,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -40,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -273,10 +277,11 @@ fun TurnyptApp() {
                 )
             }
             // Stego frame (stego plan §6.1 S4): the UI skeleton lands
-            // first, stateless — no ViewModel until a :core:stego module
-            // clears its gates.
+            // first — v1.6.0-alpha.3 moved it onto the SHARED
+            // ToolsViewModel (contact picker + unlock, the ecosystem's
+            // flow) instead of standalone local state.
             composable(DestinationRoute.STEGO) {
-                StegoScreen()
+                StegoScreen(viewModel = hiltViewModel())
             }
         }
 
@@ -516,12 +521,34 @@ private fun NavBarSlot(
                     alpha = iconAlpha.value
                 },
         )
-        Text(
-            stringResource(destination.labelRes),
-            fontSize = 10.sp,
-            lineHeight = 12.sp,
-            color = fg,
+        // v1.6.0-alpha.3 (user report: "the Advanced encryption label
+        // overflows into the walls"): the label ran at a fixed 10sp with
+        // maxLines=1 — five short English labels fit, but the sixth
+        // ("Advanced encryption" / رمزنگاری پیشرفته) blew past its slot
+        // and clipped into neighbouring slots. The slot is now
+        // width-aware: the label auto-shrinks (BasicText autoSize with
+        // TextAutoSize StepBased, 8sp floor) AND ellipsizes when even
+        // 8sp cannot fit — every label legible inside its own slot,
+        // whatever the language or bar width. Long labels keep their
+        // full text on every realistic device; a 320dp-screen six-slot
+        // worst case ellipsizes gracefully instead of bleeding.
+        BasicText(
+            text = stringResource(destination.labelRes),
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .heightIn(max = 26.dp),
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = fg,
+                textAlign = TextAlign.Center,
+            ),
+            autoSize = TextAutoSize.StepBased(
+                minFontSize = 8.sp,
+                maxFontSize = 10.sp,
+                stepSize = 0.5.sp,
+            ),
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
+

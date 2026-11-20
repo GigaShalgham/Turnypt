@@ -66,11 +66,19 @@ val LightGlass = GlassColors(
     // v1.5.3: with the dark band report in mind, the light navTint keeps
     // EXACT parity with the general glass tint (same colour, same
     // alpha) — the bar is just another pane, never its own material.
+    // v1.6.0-alpha.3 (user report: "the fully transparent glass menu lets
+    // you read — and want to tap — the buttons behind it"): FROSTED
+    // glass. The navTint is lifted to near-opaque (0xB8 → 0xF2): the
+    // backdrop now reads through only as a soft blur of light, the
+    // slots' content is clearly separated from the page beneath, and
+    // nothing behind the bar looks tappable. The rim alpha is raised
+    // (0x47 → 0x66) so the refraction edge stays crisp against the
+    // heavier tint.
     tint = Color(0xB8FFFFFF),
     tintHigh = Color(0xE8F0EAF9),
     border = Color(0x478256C7),
     highlight = Color(0x5CE8DDF9),
-    navTint = Color(0xB8FFFFFF),
+    navTint = Color(0xF2FFFFFF),
     // v1.5.5: the light backdrop is a UNIFORM warm-white field — the
     // same colour top to bottom. The old two-tone (lilac crown over
     // white foot) tinted the screen's lower region violet by design,
@@ -103,7 +111,13 @@ val DarkGlass = GlassColors(
     // so bar-over-plum stacked into the reported purple band. The tint
     // is now the scheme's OWN neutral background colour (12101A), the
     // exact field the cards sit on.
-    navTint = Color(0x5912101A),
+    // v1.6.0-alpha.3 (user report: "the fully transparent glass menu lets
+    // you read — and want to tap — the buttons behind it"): FROSTED
+    // glass, dark side. The near-invisible wash (0x59) becomes a proper
+    // smoked pane (0x99) — the page beneath the bar is no longer legible
+    // enough to invite a tap through it, and the violet rim carries the
+    // light-refraction character against the heavier tint.
+    navTint = Color(0x9912101A),
     // v1.5.5: the dark backdrop is a UNIFORM near-black field top to
     // bottom — the scheme's own background (12101A). The previous
     // two-tone (0E0C15 crown over a PLUM 171522 foot) plus the v1.5.4

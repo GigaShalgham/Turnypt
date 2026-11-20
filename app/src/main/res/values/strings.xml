@@ -370,10 +370,7 @@
     <string name="stego_carrier_hint">Pick the innocent-looking file that will carry the hidden message. PNG, JPEG, WAV or MP4.</string>
     <string name="stego_pick_carrier">Choose carrier file</string>
     <string name="stego_carrier_ready">Carrier ready</string>
-    <string name="stego_step_passphrase">2 · Shared passphrase</string>
-    <string name="stego_passphrase_hint">Only someone with this passphrase can find and read the hidden message — share it in person or through an encrypted channel.</string>
-    <string name="stego_passphrase_label">Passphrase</string>
-    <string name="stego_step_message">3 · Hidden message</string>
+    <string name="stego_step_message">2 · Hidden message</string>
     <string name="stego_message_label">Message to hide</string>
     <string name="stego_embed_action">Hide message in file</string>
     <string name="stego_coming_soon">Design preview — embedding is not wired yet.</string>

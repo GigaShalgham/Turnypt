@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -24,31 +25,38 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.turnypt.app.R
-import com.turnypt.app.ui.theme.GlassRadii
-import com.turnypt.app.ui.theme.LocalGlassTokens
-import com.turnypt.app.ui.theme.glassSurface
+import com.turnypt.app.ToolsViewModel
 
 /**
- * Stego frame, UI-only (stego plan §6.1 / S4): the SKELETON the plan ships
- * first — every surface of the Phase 1 embed flow (carrier step, passphrase
- * step, message step, preview card) laid out in the app's v1.4 "Liquid
- * Glass" component set, with NO crypto, NO BitSpread, NO container behind
- * it. The controls hold local state and nothing else; wiring to a future
- * :core:stego module comes only after the S0/S1 gates pass.
+ * Stego frame, UI-only (stego plan §6.1 / S4): the skeleton the plan ships
+ * first — every surface of the Phase 1 embed flow (carrier step, message
+ * step, preview card) laid out in the app's v1.4 "Liquid Glass" component
+ * set, with NO crypto, NO BitSpread, NO container behind it. Wiring to a
+ * future :core:stego module comes only after the S0/S1 gates pass.
  *
- * v1.4 note: this screen follows the glass rules from theme/Glass.kt by
- * using the shared SectionCard (a glass panel) rather than building its
- * own surfaces — one visual language, same as Encrypt/Decrypt.
+ * v1.6.0-alpha.3 (user request: "no shared passphrase — this option must
+ * follow the Turnypt ecosystem completely, using the same contacts
+ * system"): the standalone passphrase section is GONE. The screen now
+ * takes its recipient exactly like Encrypt/Decrypt do — the shared
+ * ContactPicker plus, when the selected contact is locked, the SAME
+ * unlock card (passphrase + fingerprint + suggestion gate) the rest of
+ * the app uses, driven by the shared ToolsViewModel. Nothing here keeps
+ * its own key material: when embedding eventually lands, the hidden
+ * message will be sealed with the selected contact's session key — the
+ * ecosystem's existing envelope — exactly like every other flow.
  */
 @Composable
-fun StegoScreen() {
+fun StegoScreen(viewModel: ToolsViewModel) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     var carrierPicked by rememberSaveable { mutableStateOf(false) }
     var carrierName by rememberSaveable { mutableStateOf("") }
     var carrierFormat by rememberSaveable { mutableStateOf(StegoCarrierFormat.PNG) }
-    var passphrase by rememberSaveable { mutableStateOf("") }
     var message by rememberSaveable { mutableStateOf("") }
     var showPreview by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { viewModel.refresh() }
 
     Column(
         modifier = Modifier
@@ -61,6 +69,14 @@ fun StegoScreen() {
             title = stringResource(R.string.stego_title),
             subtitle = stringResource(R.string.stego_subtitle),
         )
+
+        if (state.contacts.isEmpty()) {
+            EmptyState(
+                icon = TurnyptIcons.People,
+                title = stringResource(R.string.contacts_empty_title),
+                body = stringResource(R.string.contacts_empty_body),
+            )
+        }
 
         // ── Step 1: the carrier ────────────────────────────────────────
         SectionCard(
@@ -102,30 +118,61 @@ fun StegoScreen() {
             }
         }
 
-        // ── Step 2: the shared passphrase ──────────────────────────────
+        // ── Step 2: the recipient — the Turnypt ecosystem, not a
+        // standalone passphrase. Same ContactPicker, same lock state
+        // per contact, same unlock flow as Encrypt/Decrypt. ──────────
         SectionCard(
-            title = stringResource(R.string.stego_step_passphrase),
-            icon = TurnyptIcons.Key,
+            title = stringResource(R.string.encrypt_contact_label),
+            icon = TurnyptIcons.People,
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    stringResource(R.string.stego_passphrase_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = passphrase,
-                    onValueChange = { passphrase = it },
-                    label = { Text(stringResource(R.string.stego_passphrase_label)) },
-                    singleLine = true,
-                    visualTransformation =
-                        androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                PassphraseStrengthHint(passphrase)
+            ContactPicker(
+                contacts = state.contacts,
+                selectedContactId = state.selectedContactId,
+                unlocked = state.unlocked,
+                onContactSelected = viewModel::selectContact,
+            )
+        }
+
+        // The shared unlock card: shown exactly when the selected contact
+        // is locked — the same PassphraseInput (+ fingerprint offer, +
+        // honest suggestion gate) the Encrypt tab renders, reading the
+        // same ToolsViewModel state. Mirrors the private UnlockCard in
+        // EncryptScreen.kt (kept private there deliberately; this screen
+        // follows its shape rather than widening its visibility).
+        if (state.selectedContact != null && state.selectedContactId !in state.unlocked) {
+            SectionCard(
+                title = stringResource(
+                    R.string.unlock_for_title,
+                    state.unlockContactName ?: state.selectedContact!!.displayName,
+                ),
+                icon = TurnyptIcons.Lock,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.locked_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    PassphraseInput(
+                        label = stringResource(R.string.passphrase_label),
+                        buttonLabel = stringResource(R.string.unlock_encrypt_action),
+                        busy = state.busy,
+                        onSubmit = viewModel::unlockAndContinue,
+                        // v0.5.2: the suggestion appears at the password-entry
+                        // moment, but only when this side is CHOOSING the
+                        // passphrase (a locally created era, never unlocked)
+                        // — an imported era means the peer already picked it.
+                        allowSuggestion = state.suggestPassphrase,
+                        onCopySensitive = viewModel::copyPassphrase,
+                    )
+                    if (state.biometricOffered) {
+                        OutlinedButton(
+                            onClick = viewModel::requestBiometricUnlock,
+                            enabled = !state.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.use_fingerprint)) }
+                    }
+                }
             }
         }
 
@@ -148,7 +195,10 @@ fun StegoScreen() {
         // ── The action ────────────────────────────────────────────────
         Button(
             onClick = { showPreview = true },
-            enabled = carrierPicked && passphrase.isNotEmpty() && message.isNotEmpty(),
+            enabled = carrierPicked &&
+                state.selectedContact != null &&
+                state.selectedContactId in state.unlocked &&
+                message.isNotEmpty(),
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp),
@@ -199,9 +249,8 @@ fun StegoScreen() {
             }
         }
 
-        // v1.5.6: the NavHost no longer cuts its viewport above the bar,
-        // so this spacer is the screen's own clearance under the floating
-        // glass — same 96dp clearance every scrolling screen carries.
+        // The screen's own clearance under the floating glass — the same
+        // 96dp clearance every scrolling screen carries.
         Spacer(modifier = Modifier.height(96.dp))
     }
 }
@@ -221,7 +270,6 @@ private fun CarrierPickedRow(
     format: StegoCarrierFormat,
     onClear: () -> Unit,
 ) {
-    val glass = LocalGlassTokens.current
     Row(
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

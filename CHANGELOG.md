@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-alpha.3] - 2026-11-20 — three user reports, one build (prerelease)
+
+### 1. The Advanced encryption label overflowed into the walls
+
+The sixth tab's label ("Advanced encryption" / رمزنگاری پیشرفته)
+ran at a fixed 10sp with maxLines=1 — five short English labels
+fit, the sixth bled into its neighbours. The slot is now
+width-aware: the label auto-shrinks (BasicText stepwise autoSize,
+10sp → 8sp floor) and ellipsizes when even 8sp cannot fit, so
+every label stays legible inside its own slot whatever the
+language or bar width.
+
+### 2. The glass menu was fully transparent — you could read (and
+want to tap) the buttons behind it
+
+Frosted glass, both schemes. Light navTint lifts 0xB8 → 0xF2
+(the page beneath now reads through only as a soft blur of
+light); dark navTint lifts its near-invisible wash 0x59 → 0x99
+(a proper smoked pane). Nothing behind the bar is legible enough
+to invite a tap through it; the violet refraction rim stays crisp
+against the heavier tint and carries the light-refraction
+character.
+
+### 3. No shared passphrase — the stego frame joins the ecosystem
+
+The standalone "2 · Shared passphrase" step is GONE. The frame
+now takes its recipient exactly like Encrypt/Decrypt: the shared
+ContactPicker (lock state per contact), and when the selected
+contact is locked, the SAME unlock card — PassphraseInput with
+the fingerprint offer and the honest first-passphrase suggestion
+gate — driven by the SHARED ToolsViewModel instead of local
+state. Steps renumbered to 1 · Carrier, 2 · Hidden message; the
+empty-contacts state shows the same EmptyState as Encrypt. When
+embedding eventually lands, the hidden message will be sealed
+with the selected contact's session key — the ecosystem's
+existing envelope, no second key material anywhere.
+
 ## [1.6.0-alpha.2] - 2026-11-20 — Advanced encryption joins the main menu (prerelease)
 
 ### The stego tab, one level deeper
