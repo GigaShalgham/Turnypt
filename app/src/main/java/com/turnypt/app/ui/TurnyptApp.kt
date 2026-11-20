@@ -36,11 +36,18 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,7 +74,8 @@ import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.ui.theme.GlassRadii
 import com.turnypt.app.ui.theme.LocalGlassTokens
 import com.turnypt.app.ui.theme.glassBackdrop
-import com.turnypt.app.ui.theme.glassFrost
+import com.turnypt.app.ui.theme.glassBackdropPane
+import com.turnypt.app.ui.theme.glassCapture
 import com.turnypt.app.ui.theme.glassSurface
 
 /**
@@ -108,6 +116,16 @@ fun TurnyptApp() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val glass = LocalGlassTokens.current
 
+    // v1.6.0-alpha.5 (user report, second strike: "هیچ تاری و شکسته نوری
+    // وجود نداره"): the REAL backdrop blur. The NavHost records its own
+    // pixels into this layer every frame (glassCapture), and the floating
+    // bar draws that layer BLURRED as its backdrop (glassBackdropPane) —
+    // the page's actual content, smeared, seen THROUGH the glass. alpha.4
+    // blurred a flat colour swatch, which mathematically changes nothing
+    // (a uniform blur of a uniform fill is the same fill) — no wonder
+    // the user saw nothing. This one blurs REAL pixels.
+    val contentLayer = rememberGraphicsLayer()
+
     // v1.5.7 perf: the destination table is a compile-time constant —
     // it was rebuilt (five data class allocations + the list) on every
     // recomposition of the app root, which happens on EVERY tab change
@@ -124,8 +142,30 @@ fun TurnyptApp() {
             .fillMaxSize()
             .glassBackdrop(glass),
     ) {
-        NavHost(
-            navController = navController,
+        // v1.6.0-alpha.5: capture in ROOT coordinates. The Box wrapper
+        // holds ONLY the NavHost (the bar stays a SIBLING, outside the
+        // capture), so the recorded layer is the full screen in root
+        // coordinates and the bar's paneTopLeft (positionInRoot) samples
+        // the exact region it floats over. A feedback loop is impossible:
+        // the bar is never recorded.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .glassCapture(contentLayer),
+        ) {
+            NavHost(
+                // v1.5.3 (user report: "the top of the app spills out a
+                // bit"): edge-to-edge is enforced at targetSdk 36 and NO
+                // status-bar inset existed anywhere in the root — the
+                // screens' plain 16dp padding let content scroll under
+                // the clock/status pills. The host insets its content
+                // past the status bar here, once, for every screen.
+                // v1.5.6: full height (see the glass-clearance note below
+                // the transitions) — content scrolls UNDER the glass.
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding(),
+                navController = navController,
             startDestination = DestinationRoute.HOME,
             // v1.5.2 (user report: "the bottom menu flies to the Settings
             // page with NO animation"): every tab change — Settings
@@ -211,15 +251,6 @@ fun TurnyptApp() {
             // the point of a floating bar), and each screen gives its own
             // trailing clearance so the last resting item still clears the
             // bar. Nothing opaque remains between content and glass.
-            modifier = Modifier
-                .fillMaxSize()
-                // v1.5.3 (user report: "the top of the app spills out a
-                // bit"): edge-to-edge is enforced at targetSdk 36 and NO
-                // status-bar inset existed anywhere in the root — the
-                // screens' plain 16dp padding let content scroll under
-                // the clock/status pills. The host insets its content
-                // past the status bar here, once, for every screen.
-                .statusBarsPadding(),
         ) {
             composable(DestinationRoute.HOME) {
                 HomeScreen(
@@ -285,6 +316,7 @@ fun TurnyptApp() {
                 StegoScreen(viewModel = hiltViewModel())
             }
         }
+        } // v1.6.0-alpha.5: end of the capture Box (NavHost only).
 
         // The floating glass navigation bar, pinned above the content.
         // v1.5.0 (user brief §5): respect the system navigation bar's
@@ -305,7 +337,24 @@ fun TurnyptApp() {
                 .navigationBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
+            // v1.6.0-alpha.5: the bar's own absolute position on the screen,
+            // so the backdrop pane can sample the SAME region of the
+            // recorded content layer the bar floats over (the layer holds
+            // the whole screen; the pane must translate to its slice).
+            // Read through a state backed by onGloballyPositioned — the
+            // draw pass reads the CURRENT value, no recomposition.
+            var barTopLeft by remember { mutableStateOf(IntOffset.Zero) }
             FloatingGlassNavBar(
+                modifier = Modifier
+                    .onGloballyPositioned { coords ->
+                        val root = coords.positionInRoot()
+                        barTopLeft = IntOffset(
+                            x = root.x.roundToInt(),
+                            y = root.y.roundToInt(),
+                        )
+                    },
+                backdropLayer = contentLayer,
+                backdropTopLeft = { barTopLeft },
                 destinations = destinations,
                 selectedRoute = { destination ->
                     // v1.2.0 (user report: "the bottom navigation bar fails to
@@ -356,6 +405,9 @@ fun TurnyptApp() {
  */
 @Composable
 private fun FloatingGlassNavBar(
+    modifier: Modifier = Modifier,
+    backdropLayer: GraphicsLayer,
+    backdropTopLeft: () -> IntOffset,
     destinations: List<Destination>,
     selectedRoute: (Destination) -> Boolean,
     onSelect: (Destination) -> Unit,
@@ -405,27 +457,32 @@ private fun FloatingGlassNavBar(
     // children are excluded from the parent's size resolution, so the bar
     // resolved to ZERO height and the whole navigation was invisible.
     //
-    // v1.6.0-alpha.4 (user report: "the blur matters to me very, very
-    // much"): a matchParentSize BLURRED underlay beneath the crisp pane.
-    // The underlay is the scheme's own glass tint smeared by a RenderEffect
-    // (Modifier.blur), spilling ~14dp past the pane so the frost reads as
-    // a continuous halo wrapping the bar — REAL blur, not just opacity,
-    // on API 31+ (below 31 it degrades to the honest frosted tint).
+    // v1.6.0-alpha.5 — the REAL backdrop blur, in the pane itself: the
+    // modifier chain is glassBackdropPane (draw the RECORDED content
+    // pixels, blurred by a static BlurEffect + the lens-scale refraction)
+    // UNDER glassSurface (the pane's tint, bevel, rim and slots, crisp).
+    // The screen's real content visibly smears beneath the pill — the
+    // "تار" the user has now asked for twice. API 31+: RenderEffect blur;
+    // below 31 the pane still samples the recorded backdrop unblurred
+    // under the frost wash (honest translucency, no smear).
     BoxWithConstraints(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .glassBackdropPane(
+                layer = backdropLayer,
+                shape = barShape,
+                frostTint = glass.frostTint,
+                // v1.6.0-alpha.5: 24dp is a DELIBERATE frost — heavy enough
+                // that text edges visibly smear into the pane (the user
+                // rejected two builds where the effect was invisible),
+                // light enough that card shapes still read through it.
+                blurRadiusPx = with(LocalDensity.current) { 24.dp.toPx() },
+                lensScale = 1.08f,
+                paneTopLeft = backdropTopLeft,
+            )
             .glassSurface(glass, barShape, tint = glass.navTint)
             .padding(6.dp),
     ) {
-        // The blurred underlay FIRST (behind the crisp pane's children).
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .glassFrost(
-                    shape = barShape,
-                    frostTint = glass.frostTint,
-                ),
-        )
         val slotWidth = maxWidth / destinations.size
         // The sliding selection pill under the active slot's content.
         // v1.5.0 perf: the offset reads the animation INSIDE the lambda

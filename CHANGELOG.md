@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-alpha.5] - 2026-11-20 — the REAL backdrop blur (prerelease)
+
+### Why alpha.4 showed nothing (the honest post-mortem)
+
+alpha.4 "blurred" a flat colour swatch. Blurring a uniform fill
+returns the same uniform fill — a mathematical no-op painted as a
+feature. The user saw nothing because there was nothing to see.
+alpha.5 blurs THE SCREEN'S REAL PIXELS instead.
+
+### The real thing
+
+The NavHost now records its own pixels into a GraphicsLayer every
+frame (`glassCapture` — a RenderNode replay, no bitmap readback),
+and the floating bar DRAWS that recorded layer, blurred by a static
+BlurEffect RenderEffect (24dp) and lens-scaled 1.08× about the pane
+centre (`glassBackdropPane`), clipped to the pill. What shows: the
+page's actual cards/text smearing and swimming under the glass as
+they scroll — a real frosted window, the "تار" asked for twice.
+
+- Refraction (شکست نور): the 1.08× lens scale bends the sampled
+  backdrop through the pane, plus the strengthened violet rim.
+- The pane went translucent again (light 0xF2 → 0x80, dark 0x99 →
+  0x73) — near-opaque panes HIDE the blur; the blurred backdrop now
+  reads through the glass it fogs.
+- Performance: one extra content draw pass while the bar is on
+  screen; the blur effect itself is created once, never animated.
+- API 26–30 (no RenderEffect): the pane samples the recorded
+  backdrop unblurred under the doubled frost wash — translucency
+  with honest opacity, nothing tappable, no smear.
+
 ## [1.6.0-alpha.4] - 2026-11-20 — the blur the user asked for (prerelease)
 
 ### 1. "پیشرفته" alone — no ellipsis, no shrinking

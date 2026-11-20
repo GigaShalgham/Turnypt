@@ -1,22 +1,35 @@
 package com.turnypt.app.ui.theme
 
+import android.os.Build
 import android.view.Window
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import kotlin.math.roundToInt
 
 /**
  * v1.4.0 "Liquid Glass" tokens (docs/DESIGN.md §Liquid Glass pass): the
@@ -93,11 +106,20 @@ val LightGlass = GlassColors(
     // report; the blur carries the "تار" half.
     border = Color(0x808256C7),
     highlight = Color(0x5CE8DDF9),
-    navTint = Color(0xF2FFFFFF),
-    // v1.6.0-alpha.4: the light frost wash smeared under the pane —
-    // white-violet glass at the general translucency weight, so the
-    // blur's halo reads as the pane's own light, never a fog.
-    frostTint = Color(0xB8FFFFFF),
+    // v1.6.0-alpha.5: the pane goes TRANSLUCENT again (0xF2 → 0x80).
+    // alpha.3 raised navTint to near-opaque to "frost" the bar, but with
+    // the REAL backdrop blur now in the pane (glassBackdropPane samples
+    // the recorded screen pixels and smears them), opacity is the WRONG
+    // tool — a near-opaque pane HIDES the very blur the user demanded
+    // twice. The layering that works: translucent pane (0x80) → the
+    // blurred screen content reads through it as smeared light → frost
+    // wash (frostTint) → rim. Below API 31 (no blur) the caller still
+    // gets honest opacity from frostTint — see TurnyptApp.
+    navTint = Color(0x80FFFFFF),
+    // v1.6.0-alpha.5: the frost wash OVER the blurred backdrop — half
+    // the old weight (0xB8 → 0x5C): it now only cools the smeared
+    // pixels' colour, never hides them.
+    frostTint = Color(0x5CE8DDF9),
     // v1.5.5: the light backdrop is a UNIFORM warm-white field — the
     // same colour top to bottom. The old two-tone (lilac crown over
     // white foot) tinted the screen's lower region violet by design,
@@ -140,12 +162,16 @@ val DarkGlass = GlassColors(
     // smoked pane (0x99) — the page beneath the bar is no longer legible
     // enough to invite a tap through it, and the violet rim carries the
     // light-refraction character against the heavier tint.
-    navTint = Color(0x9912101A),
-    // v1.6.0-alpha.4: the dark frost wash smeared under the pane —
-    // plum-neutral at the general glass weight, so the blur's halo is
-    // the pane's own smoke, not a new colour near the screen's foot
-    // (the v1.5.5 lesson).
-    frostTint = Color(0x662A2440),
+    // v1.6.0-alpha.5: with the REAL backdrop blur in the pane, the dark
+    // smoked pane also leans out (0x99 → 0x73) so the smeared content
+    // reads through it — the blur makes the text unreadable; opacity
+    // only has to keep the colour.
+    navTint = Color(0x7312101A),
+    // v1.6.0-alpha.5: the dark frost wash over the blurred backdrop —
+    // half the old weight (0x66 → 0x40): cools the smeared pixels
+    // without hiding them (the v1.5.5 lesson: no NEW colour at the
+    // screen's foot).
+    frostTint = Color(0x40191526),
     // v1.5.5: the dark backdrop is a UNIFORM near-black field top to
     // bottom — the scheme's own background (12101A). The previous
     // two-tone (0E0C15 crown over a PLUM 171522 foot) plus the v1.5.4
@@ -192,58 +218,155 @@ object GlassRadii {
 }
 
 /**
- * REAL frosted glass for the floating navigation bar — v1.6.0-alpha.4
- * (user report: "the glasses and the menu went opaque, but they have no
- * refraction and no BLUR — and the blur matters to me very, very much").
- * Opacity alone (alpha.3's heavier navTint) reads as a flat slab; the
- * user wants the pane to actually FROST.
+ * v1.6.0-alpha.5 — the REAL backdrop blur, done right.
  *
- * In-app surfaces cannot sample the composited backdrop, but Compose CAN
- * blur a layer with a RenderEffect — so the bar is restructured to own
- * a blurred UNDERLAYER beneath its crisp pane:
+ * The alpha.4 attempt was mathematically dead: it blurred a FLAT COLOR
+ * swatch, and blurring a uniform fill returns the same uniform fill —
+ * zero visible change, exactly what the user (rightly) called out
+ * ("هیچ تاری و شکسته نوری وجود نداره"). What frosted glass actually
+ * does is blur THE PIXELS BEHIND IT — the live screen content as it
+ * scrolls under the pane.
  *
- *   Box(bar) {
- *     Box(.glassFrost(shape, frostTint, spill))  // blurred, spills out
- *     Box(.glassSurface(navTint)) { slots }      // crisp on top
+ * Compose cannot read the composited backdrop, but it CAN re-render any
+ * subtree into a [GraphicsLayer] and draw that layer again with a
+ * RenderEffect. So the app's own content becomes the backdrop:
+ *
+ *   Box(backdrop) {
+ *     NavHost(.glassCapture(contentLayer))   // records itself every frame
+ *     Bar(.glassBackdropPane(contentLayer))  // draws contentLayer BLURRED
  *   }
  *
- * The underlayer is a BLURRED swatch of the scheme's own glass tint,
- * padded outward by [spill] so the smear extends past the crisp pane's
- * silhouette — the soft halo a real frosted edge casts. Because the
- * RenderEffect blurs the swatch's own pixels, the spill reads as a
- * genuine continuous haze wrapping the pane (the "تار" the user is
- * asking for), while the pane, its rim and the slot labels stay crisp
- * and legible on top of it.
+ * Step 1 — THIS modifier: [glassCapture] wraps the content and mirrors
+ * it into the shared [layer]. Every frame the content draws itself
+ * normally (unchanged), then the same pixels are recorded into the
+ * layer — a second, cheap draw into an offscreen buffer (HwuiAccelerate
+ * or a RenderNode; the platform picks). The layer is NEVER drawn to
+ * the screen here; it is only a snapshot the bar will sample.
  *
- * API 31+ (RenderEffect exists): Modifier.blur renders via the platform
- * compositor (its own graphicsLayer RenderEffect — one static effect,
- * never animated; the v1.5.0 no-per-frame-shader rule stands). Below 31
- * Modifier.blur is a NO-OP documented by Compose itself, and the swatch
- * keeps a plain translucent tint — the honest frosted-alpha fallback.
+ * Performance shape: the record is a RenderNode replay, not a bitmap
+ * copy (no readback, no GPU→CPU stall on any API level); the cost is
+ * roughly one extra content draw pass while the nav bar is on screen.
+ * The v1.5.0 "no per-frame shader" rule is kept in spirit: no shader is
+ * compiled per frame — one static [BlurEffect] is applied ONCE on the
+ * bar's layer (see [glassBackdropPane]), never animated.
  */
-fun Modifier.glassFrost(
-    shape: Shape,
-    frostTint: Color,
-    spill: Dp = 14.dp,
-    blurRadius: Dp = 10.dp,
-): Modifier = this
-    // Padded outward so the blur has real pixels to smear past the pane.
-    .padding(spill)
-    .blur(
-        radius = blurRadius,
-        edgeTreatment = BlurredEdgeTreatment(shape),
-    )
-    // Shrink back so the swatch's CLIPPED core sits under the pane and
-    // only the smeared halo extends beyond it.
-    .padding(spill)
-    .clip(shape)
-    .background(frostTint, shape)
+fun Modifier.glassCapture(
+    layer: GraphicsLayer,
+): Modifier = this.drawWithCache {
+    // Record THIS node's content into the shared layer every frame.
+    onDrawWithContent {
+        // Record FIRST (the content must be in the layer before the bar
+        // draws it blurred later in this same frame). The layer records
+        // with THIS scope's density/fontScale, so its coordinate system
+        // matches the screen's exactly.
+        layer.record(
+            Density(density, fontScale),
+            layoutDirection,
+            IntSize(size.width.roundToInt(), size.height.roundToInt()),
+        ) {
+            this@onDrawWithContent.drawContent()
+        }
+        // …then draw the content to the screen as if nothing happened.
+        drawContent()
+    }
+}
+
 
 /**
- * The glass material as ONE modifier chain: clip → soft diffused shadow →
- * tint fill → specular bevel → refraction border. `drawBehind` keeps tint
- * and bevel UNDER the content; the border stroke draws over the clipped
- * edge.
+ * v1.6.0-alpha.5 — Step 2: the glass pane that DRAWS the recorded
+ * backdrop, blurred. Applied INSIDE the nav bar, as the pane's own
+ * draw pass (under the tint, bevel and slots that [glassSurface]
+ * paints above it).
+ *
+ * What the user sees when this works: the page's real content —
+ * cards, text, list rows — visibly SMearing and swimming as they
+ * scroll beneath the floating pill, like a frosted window over the
+ * screen. That is the "تار" they asked for, and it can only exist
+ * when real pixels are blurred, which is why alpha.4 (a blurred flat
+ * swatch) showed nothing.
+ *
+ * The blur, drawn edge to edge of the pane, then CLIPPED to the pill:
+ *
+ *  1. clip to [shape] (the pill),
+ *  2. translate so the pane samples the region of the screen it
+ *     actually floats over (the layer holds the WHOLE screen),
+ *  3. scale the sampled region by [lensScale] about the pane's center —
+ *     the refraction ("شکست نور"): a convex glass edge magnifies its
+ *     backdrop slightly, so the blurred content also carries a faint
+ *     lens distortion at the pane's expense,
+ *  4. draw [layer] with a static BlurEffect RenderEffect,
+ *  5. over it, [frostTint] wash (the glass's own colour) — kept
+ *     LIGHTER than the pane tint because the blur now does the work
+ *     that opacity used to do.
+ *
+ * API < 31 (no RenderEffect): the pane still samples and draws the
+ * backdrop UNBLURRED under the frost wash — translucent, honest, and
+ * the refraction scale still reads — but there is no smear. On those
+ * devices (API 26–30) the pane also gets the alpha.3 heavier wash so
+ * nothing behind the bar invites a tap; see the caller in TurnyptApp.
+ */
+fun Modifier.glassBackdropPane(
+    layer: GraphicsLayer,
+    shape: Shape,
+    frostTint: Color,
+    blurRadiusPx: Float,
+    lensScale: Float = 1.08f,
+    paneTopLeft: (() -> IntOffset)? = null,
+): Modifier = this.drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val panePath = when (outline) {
+        is Outline.Rounded -> Path().apply { addRoundRect(outline.roundRect) }
+        is Outline.Rectangle -> Path().apply { addRect(outline.rect) }
+        is Outline.Generic -> outline.path
+    }
+    // One static blur effect, created once per pane build — never
+    // animated, never recompiled (the v1.5.0 rule).
+    val blurEffect = if (Build.VERSION.SDK_INT >= 31) {
+        BlurEffect(blurRadiusPx, blurRadiusPx, TileMode.Clamp)
+    } else {
+        null
+    }
+    // v1.6.0-alpha.5 fallback: without RenderEffect there is no smear,
+    // so the frost wash doubles as the honest opacity (alpha.3 weight)
+    // — the recorded backdrop still reads through it, but nothing
+    // behind the bar is legible enough to invite a tap.
+    val effectiveTint = if (blurEffect != null) frostTint
+    else frostTint.copy(alpha = (frostTint.alpha * 1.75f).coerceAtMost(0.92f))
+    val tintBrush = SolidColor(effectiveTint)
+    onDrawWithContent {
+        // The pane's own content (slots, labels) draws ABOVE the blurred
+        // backdrop: backdrop first, then the caller's content.
+        clipPath(panePath) {
+            // Lens: scale the sampled backdrop about the pane's center —
+            // the refraction ("شکست نور") a convex pane causes. Scaling the
+            // LAYER scales the whole recorded screen about the pane's
+            // center pivot, which reads as the pane magnifying its slice
+            // of the world.
+            layer.scaleX = lensScale
+            layer.scaleY = lensScale
+            layer.pivotOffset = Offset(size.width / 2f, size.height / 2f)
+            layer.renderEffect = blurEffect
+            // The layer records the WHOLE screen (the NavHost at 0,0 in
+            // screen coordinates); the pane sits at [paneTopLeft] in the
+            // same coordinates, so translating by -paneTopLeft makes the
+            // layer's pixels land where the screen's pixels are — the pane
+            // shows a blurred copy of EXACTLY what floats behind it.
+            val pos = paneTopLeft?.invoke() ?: IntOffset.Zero
+            translate(-pos.x.toFloat(), -pos.y.toFloat()) {
+                drawLayer(layer)
+            }
+            // The glass's own colour over the smeared backdrop.
+            drawRect(tintBrush)
+        }
+        // The pane's own content (the caller's tint/bevel/slots painted by
+        // the modifiers ABOVE this one on the chain) draws OVER the blur.
+        this@onDrawWithContent.drawContent()
+    }
+}
+
+/**
+ * The quiet backdrop every screen sits on. Applied once around the app
+ * content, never per-card.
  *
  * v1.5.0 Turnip lighting: depth comes from ONE soft, diffused ambient
  * shadow (large blur, low alpha — never stacked, never crisp) plus the
