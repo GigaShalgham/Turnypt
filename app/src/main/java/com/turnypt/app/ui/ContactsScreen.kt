@@ -246,7 +246,7 @@ private fun ContactCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, RoundedCornerShape(GlassRadii.card))
+            .glassSurface(glass, GlassRadii.cardShape)
             .clickable(onClick = onClick),
     ) {
         Row(

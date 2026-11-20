@@ -344,7 +344,7 @@ private fun FloatingGlassNavBar(
     val glass = LocalGlassTokens.current
     // v1.5.7 perf: one pill shape, allocated once per bar composition
     // instead of per slot row pass.
-    val barShape = RoundedCornerShape(GlassRadii.pill)
+    val barShape = GlassRadii.pillShape
     val selectedIndex = destinations.indexOfFirst { selectedRoute(it) }
         .coerceAtLeast(0)
 

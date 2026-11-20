@@ -73,6 +73,14 @@ import com.turnypt.security.policies.PassphraseAdvisor
  */
 
 /**
+ * v1.5.10 (lag audit): the shared 50%-radius pill shape, built once.
+ * StatusChip sits inside EVERY ContactCard, so the shape used to be
+ * re-allocated per contact on every list recomposition. Identical
+ * geometry; only the allocation is gone.
+ */
+private val FiftyPercentCorner = RoundedCornerShape(percent = 50)
+
+/**
  * Titled glass card group used by every screen.
  *
  * v1.4.0: the tonal container becomes a glass panel — [glassSurface] with
@@ -90,7 +98,7 @@ fun SectionCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .glassSurface(glass, RoundedCornerShape(GlassRadii.card)),
+            .glassSurface(glass, GlassRadii.cardShape),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -146,7 +154,11 @@ fun StatusChip(
     Box(
         modifier = modifier.glassSurface(
             glass,
-            RoundedCornerShape(percent = 50),
+            // v1.5.10 (lag audit): hoisted file-level constant — this chip
+            // sits inside EVERY ContactCard, so the old per-recomposition
+            // RoundedCornerShape allocation ran per contact on every list
+            // recomposition. A 50% corner radius is the same pill shape.
+            FiftyPercentCorner,
         ),
     ) {
         Row(
@@ -228,7 +240,7 @@ fun QuickActionTile(
         ),
         label = "tilePress",
     )
-    val shape = RoundedCornerShape(GlassRadii.card)
+    val shape = GlassRadii.cardShape
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -302,7 +314,7 @@ fun EmptyState(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .glassSurface(glass, RoundedCornerShape(GlassRadii.card)),
+            .glassSurface(glass, GlassRadii.cardShape),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
@@ -365,7 +377,7 @@ fun ResultBlock(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .glassSurface(glass, RoundedCornerShape(GlassRadii.field), tint = glass.tintHigh),
+                .glassSurface(glass, GlassRadii.fieldShape, tint = glass.tintHigh),
         ) {
             SelectionContainer {
                 Text(
@@ -635,7 +647,7 @@ fun NoticeBanner(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, RoundedCornerShape(GlassRadii.chip)),
+            .glassSurface(glass, GlassRadii.chipShape),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -702,7 +714,7 @@ fun SettingSwitchRow(
             modifier = Modifier
                 .glassSurface(
                     glass,
-                    RoundedCornerShape(GlassRadii.chip),
+                    GlassRadii.chipShape,
                     tint = glass.tintHigh,
                 )
                 .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -831,7 +843,7 @@ private fun ClipboardHistoryRow(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, RoundedCornerShape(GlassRadii.chip), tint = glass.tintHigh)
+            .glassSurface(glass, GlassRadii.chipShape, tint = glass.tintHigh)
             .clickable(onClick = onUse),
     ) {
         Row(

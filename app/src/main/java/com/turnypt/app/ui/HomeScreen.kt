@@ -76,7 +76,7 @@ fun HomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .glassSurface(glass, RoundedCornerShape(GlassRadii.sheet)),
+                .glassSurface(glass, GlassRadii.sheetShape),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

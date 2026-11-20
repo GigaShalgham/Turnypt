@@ -3,6 +3,7 @@ package com.turnypt.app.ui.theme
 import android.view.Window
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -131,6 +132,21 @@ object GlassRadii {
     val card = 20.dp
     val sheet = 28.dp
     val pill = 9999.dp
+
+    // v1.5.10 (lag audit, round two): the Shape objects for the fixed
+    // radii, built ONCE. Call sites used to allocate a fresh
+    // RoundedCornerShape on every recomposition — ContactCard alone
+    // did it per contact per recomposition, and the LazyColumn
+    // recomposes a card whenever its unlock chip flips. A corner-radius
+    // shape with no corner overrides equals by value, so caching the
+    // object changes NOTHING visually; only the allocation traffic is
+    // gone. `pill` keeps the 9999.dp form (a stadium is what a huge
+    // radius renders as).
+    val chipShape: RoundedCornerShape = RoundedCornerShape(chip)
+    val fieldShape: RoundedCornerShape = RoundedCornerShape(field)
+    val cardShape: RoundedCornerShape = RoundedCornerShape(card)
+    val sheetShape: RoundedCornerShape = RoundedCornerShape(sheet)
+    val pillShape: RoundedCornerShape = RoundedCornerShape(pill)
 }
 
 /**

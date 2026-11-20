@@ -102,7 +102,7 @@ fun ToolSegmentRow(
     onImageSelected: () -> Unit,
 ) {
     val glass = LocalGlassTokens.current
-    val shape = RoundedCornerShape(GlassRadii.pill)
+    val shape = GlassRadii.pillShape
     // The indicator slides between the two halves of the track. v1.5.0
     // perf: the animated value is read only inside the offset lambda
     // (deferred read) — the animation repaints one layer, it never
@@ -229,7 +229,7 @@ fun CipherChip(
     }
     Box(
         modifier = Modifier
-            .glassSurface(glass, RoundedCornerShape(GlassRadii.pill))
+            .glassSurface(glass, GlassRadii.pillShape)
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -241,7 +241,7 @@ fun CipherChip(
         ) {
             Surface(
                 color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = RoundedCornerShape(GlassRadii.pill),
+                shape = GlassRadii.pillShape,
             ) {
                 Icon(
                     TurnyptIcons.Key,
@@ -275,7 +275,7 @@ fun PickedImageCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, RoundedCornerShape(GlassRadii.field), tint = glass.tintHigh),
+            .glassSurface(glass, GlassRadii.fieldShape, tint = glass.tintHigh),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -382,7 +382,7 @@ fun DecryptedImageCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .glassSurface(glass, RoundedCornerShape(GlassRadii.field), tint = glass.tintHigh),
+                    .glassSurface(glass, GlassRadii.fieldShape, tint = glass.tintHigh),
             ) {
                 Image(
                     bitmap = result.preview,

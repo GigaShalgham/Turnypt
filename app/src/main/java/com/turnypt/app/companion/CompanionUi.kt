@@ -236,7 +236,7 @@ private fun EncryptPrepareCard(
                 .fillMaxWidth()
                 .glassSurface(
                     glass,
-                    RoundedCornerShape(GlassRadii.field),
+                    GlassRadii.fieldShape,
                     tint = glass.tintHigh,
                 ),
         ) {

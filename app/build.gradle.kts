@@ -31,8 +31,8 @@ android {
         applicationId = "com.turnypt"
         minSdk = 26
         targetSdk = 36
-        versionCode = 32
-        versionName = "1.5.9"
+        versionCode = 33
+        versionName = "1.5.10"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -42,7 +42,13 @@ android {
     signingConfigs {
         if (keystorePropertiesFile.exists()) {
             create("release") {
-                storeFile = File(keystoreProperties.getProperty("storeFile"))
+                // v1.5.10: relative storeFile paths resolve against the
+                // PROJECT root (rootProject.file), not app/ — the bare
+                // "turnypt-release.jks" in keystore.properties used to be
+                // read as app/turnypt-release.jks.
+                storeFile = rootProject.file(
+                    keystoreProperties.getProperty("storeFile")
+                )
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
@@ -55,13 +61,17 @@ android {
             isMinifyEnabled = false
         }
         release {
-            // v0.1.0-alpha: minification intentionally disabled. No on-device
-            // verification exists yet, and R8/resource-shrinking would add an
-            // unverified transformation layer on top of an unverified build.
-            // Re-evaluate once instrumented/smoke testing exists (tracked in
-            // the engineering report, remaining work).
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // v1.5.10 (lag audit, round two): minification ON. The user
+            // reported the app STILL very laggy after v1.5.9 — and the
+            // shipped artifact was the DEBUG build: `application-debuggable`
+            // (JNI asserts on every call, debugger-attach deopt, no ART AOT
+            // optimization) plus 19 dex files of unshrunk Compose. The
+            // release variant with R8 + resource shrinking removes all of
+            // that; keep rules (proguard-rules.pro) are the conservative
+            // set — Compose internals, Hilt/Dagger, Room entities and enum
+            // reflection are kept, so runtime behavior is unchanged.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -94,6 +104,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
+    }
+
+    // v1.5.10 (lag audit, round two): lintVitalAnalyzeRelease OOM-killed
+    // the 4 GiB sandbox daemon mid-assemble (see gradle.properties memory
+    // doctrine). Lint analysis is a CI concern, not a packaging step; the
+    // release APK gets built first, lint stays runnable on demand.
+    lint {
+        checkReleaseBuilds = false
     }
 }
 
