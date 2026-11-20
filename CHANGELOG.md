@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-alpha.2] - 2026-11-20 — Advanced encryption joins the main menu (prerelease)
+
+### The stego tab, one level deeper
+
+v1.6.0-alpha.1 put "Hide in file" in Quick Access only; the user
+asked for it in the MAIN menu as "Advanced encryption" (رمزنگاری
+پیشرفته). The floating glass bar now carries six slots — Home,
+Encrypt, Decrypt, **Advanced encryption**, Contacts, Settings —
+with the new tab between plain encryption and the contacts/settings
+pair. The selection pill needed no retuning: it animates to the
+live slot index, so six destinations slide exactly as five did,
+same ~280ms critically-damped spring, same deferred-read structure
+(an animation frame is one layer translate; slots never recompose).
+The tab routes to the same stateless UI frame — still no system
+behind it; Persian label included. First release signed with the
+sandbox release key (see the alpha.1 install note about uninstalling
+differently-signed builds).
+
 ## [1.6.0-alpha.1] - 2026-11-20 — the stego frame, laid out first (prerelease)
 
 ### Design preview: "Hide in file"
