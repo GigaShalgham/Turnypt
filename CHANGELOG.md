@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-alpha.1] - 2026-11-20 — the stego frame, laid out first (prerelease)
+
+### Design preview: "Hide in file"
+
+The first piece of the steganography feature (the plan's stage S4:
+the UI ships before any system exists behind it). Home gains a third
+quick-action row — "Hide in file" — routing to a new screen that
+walks the full Phase 1 embed flow in the app's Liquid Glass language:
+pick a carrier file (PNG / JPEG / WAV / MP4), enter the shared
+passphrase with the live strength hint, type the hidden message, and
+review the preview card with its document-mode explainer (send the
+result as a FILE, never as media — messengers re-encode photos,
+audio and video, and re-encoding destroys hidden data).
+
+Nothing behind it yet — deliberately. No crypto, no embedding, no
+container: the carrier button, embed button and share button hold
+local UI state only, and the screen says so plainly ("Design
+preview — embedding is not wired yet"). The frame exists so the
+layout, wording and step order can settle before a single line of
+the real system (gated behind the plan's S0/S1 milestones) lands.
+Persian translations included; `stego` route is stateless — no
+ViewModel until the core module clears its gates.
+
 ## [1.5.8] - 2026-11-17 — two user-reported bugs (prerelease)
 
 ### Bug 1: the add-contact button sat UNDER the floating menu
