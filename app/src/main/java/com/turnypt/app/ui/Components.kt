@@ -52,10 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.turnypt.app.R
 import com.turnypt.app.companion.UiNotice
-import com.turnypt.app.ui.theme.LocalGlassTokens
 import com.turnypt.app.ui.theme.LocalSemanticColors
-import com.turnypt.app.ui.theme.glassSurface
-import com.turnypt.app.ui.theme.GlassRadii
 import com.turnypt.security.policies.PassphraseAdvisor
 
 /**
@@ -94,11 +91,10 @@ fun SectionCard(
     icon: ImageVector? = null,
     content: @Composable () -> Unit,
 ) {
-    val glass = LocalGlassTokens.current
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .glassSurface(glass, GlassRadii.cardShape),
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -140,7 +136,6 @@ fun StatusChip(
     icon: ImageVector? = null,
 ) {
     val semantic = LocalSemanticColors.current
-    val glass = LocalGlassTokens.current
     val stateBg = if (positive) {
         semantic.successContainer
     } else {
@@ -151,15 +146,10 @@ fun StatusChip(
     } else {
         MaterialTheme.colorScheme.onSecondaryContainer
     }
-    Box(
-        modifier = modifier.glassSurface(
-            glass,
-            // v1.5.10 (lag audit): hoisted file-level constant — this chip
-            // sits inside EVERY ContactCard, so the old per-recomposition
-            // RoundedCornerShape allocation ran per contact on every list
-            // recomposition. A 50% corner radius is the same pill shape.
-            FiftyPercentCorner,
-        ),
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = FiftyPercentCorner,
+        modifier = modifier,
     ) {
         Row(
             // v1.5.5: symmetric padding — the old start=8/end=12 (an RTL
@@ -209,7 +199,6 @@ fun QuickActionTile(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val glass = LocalGlassTokens.current
     // v1.5.7 perf: pressed-state tracking runs on the ONE gesture
     // pipeline. The tile previously wired BOTH clickable's
     // interactionSource AND a private pointerInput/awaitEachGesture
@@ -240,7 +229,6 @@ fun QuickActionTile(
         ),
         label = "tilePress",
     )
-    val shape = GlassRadii.cardShape
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -249,7 +237,10 @@ fun QuickActionTile(
                 scaleX = scale.value
                 scaleY = scale.value
             }
-            .glassSurface(glass, shape)
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerLow,
+                MaterialTheme.shapes.medium,
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -310,11 +301,13 @@ fun EmptyState(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
-    val glass = LocalGlassTokens.current
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .glassSurface(glass, GlassRadii.cardShape),
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerLow,
+                MaterialTheme.shapes.medium,
+            ),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
@@ -322,7 +315,7 @@ fun EmptyState(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Surface(
-                color = glass.tintHigh,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 shape = CircleShape,
             ) {
                 Icon(
@@ -372,12 +365,14 @@ fun ResultBlock(
     onCopy: () -> Unit,
     onClear: () -> Unit,
 ) {
-    val glass = LocalGlassTokens.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .glassSurface(glass, GlassRadii.fieldShape, tint = glass.tintHigh),
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                    MaterialTheme.shapes.small,
+                ),
         ) {
             SelectionContainer {
                 Text(
@@ -621,7 +616,6 @@ fun NoticeBanner(
         stringResourceCompat(notice.res, arg)
     } ?: stringResourceCompat(notice.res)
     val semantic = LocalSemanticColors.current
-    val glass = LocalGlassTokens.current
     val (insetBg, insetFg, icon) = when (tone) {
         NoticeTone.INFO -> Triple(
             MaterialTheme.colorScheme.secondaryContainer,
@@ -647,7 +641,10 @@ fun NoticeBanner(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, GlassRadii.chipShape),
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerHigh,
+                MaterialTheme.shapes.extraSmall,
+            ),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -692,7 +689,6 @@ fun SettingSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     subtitle: String? = null,
 ) {
-    val glass = LocalGlassTokens.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -710,17 +706,7 @@ fun SettingSwitchRow(
                 )
             }
         }
-        Box(
-            modifier = Modifier
-                .glassSurface(
-                    glass,
-                    GlassRadii.chipShape,
-                    tint = glass.tintHigh,
-                )
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-        ) {
-            Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
-        }
+        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -740,14 +726,12 @@ fun ContactAvatar(
     modifier: Modifier = Modifier,
 ) {
     val semantic = LocalSemanticColors.current
-    val glass = LocalGlassTokens.current
-    val stateFill = if (unlocked) semantic.successContainer else glass.tintHigh
+    val stateFill = if (unlocked) semantic.successContainer else MaterialTheme.colorScheme.surfaceContainerHigh
     val fg = if (unlocked) semantic.onSuccessContainer else MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         modifier = modifier
             .size(40.dp)
-            .background(stateFill, CircleShape)
-            .glassSurface(glass, CircleShape, tint = glass.tint.copy(alpha = glass.tint.alpha * 0.45f)),
+            .background(stateFill, CircleShape),
     ) {
         Text(
             text = name.trim().take(1).uppercase(),
@@ -839,11 +823,13 @@ private fun ClipboardHistoryRow(
     onUse: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val glass = LocalGlassTokens.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, GlassRadii.chipShape, tint = glass.tintHigh)
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerHigh,
+                MaterialTheme.shapes.extraSmall,
+            )
             .clickable(onClick = onUse),
     ) {
         Row(

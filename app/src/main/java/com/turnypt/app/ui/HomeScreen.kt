@@ -1,6 +1,7 @@
 package com.turnypt.app.ui
 
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,9 +34,6 @@ import com.turnypt.app.MainViewModel
 import com.turnypt.app.R
 import com.turnypt.app.companion.DestinationRoute
 import com.turnypt.app.companion.EXTRA_FROM_CLIPBOARD
-import com.turnypt.app.ui.theme.GlassRadii
-import com.turnypt.app.ui.theme.LocalGlassTokens
-import com.turnypt.app.ui.theme.glassSurface
 
 /**
  * Home (v0.5, "Calm Vault"): brand header, one status card, one
@@ -72,11 +70,13 @@ fun HomeScreen(
         // rests in a primary-tinted medallion over the glass panel, the
         // name/tagline beside it. The hero is the one place Home carries
         // visual weight; everything below stays quiet.
-        val glass = LocalGlassTokens.current
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .glassSurface(glass, GlassRadii.sheetShape),
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    MaterialTheme.shapes.large,
+                ),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

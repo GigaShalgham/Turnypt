@@ -117,10 +117,6 @@ class ImageCipherActivity : FragmentActivity() {
         if (savedInstanceState == null) {
             dispatchIntent(intent)
         }
-        // v1.4.0 Liquid Glass: same platform window blur as the text
-        // companion sheets — the caller beneath reads as frosted depth
-        // (API 31+, compositor-side; the dimmed scrim below 31).
-        com.turnypt.app.ui.theme.applyWindowBackgroundBlur(window)
         setContent {
             TurnyptTheme {
                 ImageCipherSheet(

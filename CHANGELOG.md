@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.1] - 2026-11-21 — GLASS REMOVED (prerelease)
+
+### The decree
+
+"Back to the previous main design — no glass anywhere, and kill every
+bit of lag it brought." The v1.4.0 "Liquid Glass" language (every
+translucent tint, refraction rim, specular bevel, frost wash, the
+per-frame glassCapture/glassBackdropPane RenderEffect pipeline) is
+DELETED from the codebase, not disabled. What comes back is the
+pre-glass v1.3.2 Material design.
+
+### Removed
+
+- The floating glass pill bar → the standard docked Material
+  `NavigationBar` in a `Scaffold`. No capture layer, no BlurEffect,
+  no lens refraction — the per-frame double-draw of the whole NavHost
+  (the lag) is gone with it.
+- Every `glassSurface`/`glassBackdropPane`/`glassBackdrop` call site
+  across TurnyptApp, Components, Home/Contacts/Settings, ImageCipherUi,
+  CompanionUi → plain opaque Material `Surface`/`background` with the
+  scheme's own container roles.
+- `applyWindowBackgroundBlur` (window blur behind the companion
+  sheets) from both companion activities.
+- `GlassColors`/`LocalGlassTokens`, `navTint`/`frostTint` and the
+  whole tint/border/highlight model from the theme.
+
+### Kept (features, not glass)
+
+- The six-tab bar: Home, Encrypt, Decrypt, Advanced encryption
+  (stego frame), Contacts, Settings.
+- The 280ms single-clock crossfade transitions and all navigation
+  behaviour fixes (base-route matching, retap-to-default, deep links).
+- The corner-radius system (12/16/20/28 + pill) — historical name
+  `GlassRadii` kept so the diff stays mechanical.
+- RELEASE, not debug builds (the v1.5.10 lesson stands).
+
+
 ## [1.6.0-alpha.5] - 2026-11-20 — the REAL backdrop blur (prerelease)
 
 ### Why alpha.4 showed nothing (the honest post-mortem)

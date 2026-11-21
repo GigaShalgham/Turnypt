@@ -128,13 +128,6 @@ private val LightColors = lightColorScheme(
 val LocalSemanticColors = staticCompositionLocalOf { LightSemantic }
 
 /**
- * v1.4.0: the Liquid Glass token set. Read via `LocalGlassColors.current`;
- * provided by [TurnyptTheme] alongside [LocalSemanticColors]. See
- * [GlassColors] for the material model.
- */
-val LocalGlassTokens = staticCompositionLocalOf { LightGlass }
-
-/**
  * v1.4.0 "Liquid Glass" corner system: one continuous radius family
  * (12/16/20/28 + pill) replacing the v0.5 8/12/16/24/32 set — Glass
  * components read their shapes from [GlassRadii], never local literals.
@@ -231,7 +224,6 @@ fun TurnyptTheme(
     ) {
         CompositionLocalProvider(
             LocalSemanticColors provides if (darkTheme) DarkSemantic else LightSemantic,
-            LocalGlassTokens provides if (darkTheme) DarkGlass else LightGlass,
             // v1.5.3 (user report, second strike: "the black texts are
             // STILL black and don't match the dark background"): the
             // systemic cause — MaterialTheme does NOT provide

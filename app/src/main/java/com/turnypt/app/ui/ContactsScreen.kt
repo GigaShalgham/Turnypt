@@ -1,6 +1,7 @@
 package com.turnypt.app.ui
 
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,9 +55,6 @@ import com.turnypt.app.companion.UiNotice
 import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.security.BiometricPromptHost
 import com.turnypt.app.security.rememberBiometricPromptHelper
-import com.turnypt.app.ui.theme.GlassRadii
-import com.turnypt.app.ui.theme.LocalGlassTokens
-import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.data.repository.Contact
 import com.turnypt.data.repository.UnlockOutcome
 import com.turnypt.security.policies.Argon2Profile
@@ -242,11 +240,13 @@ private fun ContactCard(
     eraCount: Int,
     onClick: () -> Unit,
 ) {
-    val glass = LocalGlassTokens.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, GlassRadii.cardShape)
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerLow,
+                MaterialTheme.shapes.medium,
+            )
             .clickable(onClick = onClick),
     ) {
         Row(

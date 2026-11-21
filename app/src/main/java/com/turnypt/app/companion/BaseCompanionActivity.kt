@@ -13,7 +13,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import com.turnypt.app.companion.CompanionUiState.Phase
 import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.ui.theme.TurnyptTheme
-import com.turnypt.app.ui.theme.applyWindowBackgroundBlur
 import javax.inject.Inject
 
 /**
@@ -82,12 +81,6 @@ abstract class BaseCompanionActivity : FragmentActivity() {
                 dispatchIntent(intent)
             }
         }
-        // v1.4.0 Liquid Glass: the sheet is translucent over the calling
-        // app — the platform's own window blur (API 31+) makes the app
-        // beneath read as genuine frosted depth, compositor-side (no
-        // per-frame shader). Below 31 the dimmed scrim from the theme
-        // already reads as glass.
-        applyWindowBackgroundBlur(window)
         setContent {
             TurnyptTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()

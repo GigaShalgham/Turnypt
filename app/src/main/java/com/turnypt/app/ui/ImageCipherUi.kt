@@ -28,6 +28,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import com.turnypt.app.ui.theme.GlassRadii
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -51,9 +52,6 @@ import java.io.File
 import com.turnypt.app.R
 import com.turnypt.app.ToolsUiState
 import com.turnypt.app.companion.ImageFiles
-import com.turnypt.app.ui.theme.GlassRadii
-import com.turnypt.app.ui.theme.LocalGlassTokens
-import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.data.preferences.CipherPreference
 
 /**
@@ -101,7 +99,6 @@ fun ToolSegmentRow(
     onTextSelected: () -> Unit,
     onImageSelected: () -> Unit,
 ) {
-    val glass = LocalGlassTokens.current
     val shape = GlassRadii.pillShape
     // The indicator slides between the two halves of the track. v1.5.0
     // perf: the animated value is read only inside the offset lambda
@@ -126,7 +123,7 @@ fun ToolSegmentRow(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, shape, tint = glass.tintHigh)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, shape)
             .padding(4.dp),
     ) {
         val halfWidth = maxWidth / 2
@@ -222,14 +219,16 @@ fun CipherChip(
     onClick: () -> Unit,
 ) {
     val resolved = resolvedName ?: return
-    val glass = LocalGlassTokens.current
     val label = when (preference) {
         CipherPreference.AUTO -> stringResource(R.string.cipher_auto_resolved, resolved)
         else -> stringResource(R.string.cipher_chip_label, resolved)
     }
     Box(
         modifier = Modifier
-            .glassSurface(glass, GlassRadii.pillShape)
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerLow,
+                GlassRadii.pillShape,
+            )
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -241,7 +240,7 @@ fun CipherChip(
         ) {
             Surface(
                 color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = GlassRadii.pillShape,
+                shape = MaterialTheme.shapes.large,
             ) {
                 Icon(
                     TurnyptIcons.Key,
@@ -269,13 +268,13 @@ fun PickedImageCard(
     busy: Boolean,
     onReplace: () -> Unit,
 ) {
-    val glass = LocalGlassTokens.current
-    // v1.4.0: raised glass layer (tintHigh) — the picked file reads as an
-    // object resting ON the card glass.
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, GlassRadii.fieldShape, tint = glass.tintHigh),
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerHigh,
+                MaterialTheme.shapes.small,
+            ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -376,13 +375,13 @@ fun DecryptedImageCard(
         icon = TurnyptIcons.Image,
     ) {
         if (result.preview != null) {
-            // v1.4.0: the preview rests on a raised glass plate — depth
-            // between the photo and the card glass.
-            val glass = LocalGlassTokens.current
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .glassSurface(glass, GlassRadii.fieldShape, tint = glass.tintHigh),
+                    .background(
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        MaterialTheme.shapes.small,
+                    ),
             ) {
                 Image(
                     bitmap = result.preview,

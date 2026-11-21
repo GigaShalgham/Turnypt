@@ -3,6 +3,7 @@ package com.turnypt.app.ui
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,9 +52,6 @@ import com.turnypt.app.security.BiometricGate
 import com.turnypt.app.companion.UiNotice
 import com.turnypt.core.crypto.CipherAlgorithm
 import com.turnypt.data.preferences.CipherPreference
-import com.turnypt.app.ui.theme.GlassRadii
-import com.turnypt.app.ui.theme.LocalGlassTokens
-import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.security.policies.Argon2Profile
 import com.turnypt.security.policies.KeyPolicy
 
@@ -269,14 +267,12 @@ fun SettingsScreen(
             var cipherDialogOpen by remember { mutableStateOf(false) }
             // v1.4.0: the preference row reads as a raised glass plate
             // (tintHigh) — one tap target, same dialog behind it.
-            val glass = LocalGlassTokens.current
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .glassSurface(
-                        glass,
-                        GlassRadii.fieldShape,
-                        tint = glass.tintHigh,
+                    .background(
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        MaterialTheme.shapes.small,
                     )
                     .clickable(onClick = { cipherDialogOpen = true }),
             ) {
