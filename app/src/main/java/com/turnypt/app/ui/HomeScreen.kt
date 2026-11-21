@@ -215,11 +215,10 @@ fun HomeScreen(
             }
         }
 
-        // v1.5.6: the NavHost no longer cuts its viewport above the bar,
-        // so THIS spacer is the screen's own clearance under the floating
-        // glass — 96dp clears the ~64dp pane plus its 12dp vertical inset
-        // with margin to spare, while scrolled content still slides
-        // beneath the translucent glass (nothing opaque between them).
-        Spacer(modifier = Modifier.height(96.dp))
+        // v1.6.0-beta.1: the glass-era 96dp clearance spacer is gone —
+        // the docked Scaffold NavigationBar already reserves its own
+        // space through contentPadding, so the last tile rests at the
+        // natural bottom margin like every pre-glass screen did.
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }

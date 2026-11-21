@@ -249,9 +249,9 @@ fun StegoScreen(viewModel: ToolsViewModel) {
             }
         }
 
-        // The screen's own clearance under the floating glass — the same
-        // 96dp clearance every scrolling screen carries.
-        Spacer(modifier = Modifier.height(96.dp))
+        // v1.6.0-beta.1: the glass-era clearance spacer is gone — the
+        // docked Scaffold NavigationBar reserves its own space.
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 

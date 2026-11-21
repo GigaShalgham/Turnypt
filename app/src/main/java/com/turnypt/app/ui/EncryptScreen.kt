@@ -315,11 +315,9 @@ fun EncryptScreen(
             )
         }
 
-        // v1.5.6: the screen's own clearance under the floating glass bar
-        // (the NavHost viewport cut is gone; see TurnyptApp) — the last
-        // resting item clears the ~64dp pane, scrolled content slides
-        // beneath it.
-        Spacer(modifier = Modifier.height(96.dp))
+        // v1.6.0-beta.1: the glass-era clearance spacer is gone — the
+        // docked Scaffold NavigationBar reserves its own space.
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 

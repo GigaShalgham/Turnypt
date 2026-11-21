@@ -37,6 +37,7 @@ include(":keyboard")
 
 include(":core:common")
 include(":core:crypto")
+include(":core:stego")
 include(":core:messages")
 include(":core:keys")
 include(":core:sessions")

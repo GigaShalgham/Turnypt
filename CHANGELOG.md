@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.2] - 2026-11-21 — stego S1 lands (prerelease)
+
+### Fixed (the beta.1 glass-revert leftovers)
+
+- The glass-era 96dp "clearance" spacers under every scrolling screen
+  and the FAB's 96dp bottom padding are GONE — the docked Scaffold
+  NavigationBar reserves its own space; content rests at its natural
+  bottom margin like pre-glass v1.3.2.
+
+### Advanced cryptography plan — S1 (core:stego)
+
+- NEW `:core:stego` module (pure Kotlin, JVM-tested, plan §5.1):
+  - **Cks2 codec** (plan §4.2 rev 1.1): passphrase-only container;
+    Argon2id master → two-key split (K_frame/K_payload via HKDF);
+    cleartext 12B frame nonce + AES-256-GCM sealed_len(24B) in the
+    fixed 64-byte frame; 64 KiB chunked AEAD body with CKF1 rules
+    (counter nonces, frame-AAD binding, strictly-short final chunk
+    as the truncation sentinel).
+  - **BitSpread** (plan §4.3): keyed 4-round Feistel permutation with
+    proper cycle-walking over the carrier index space (bijective,
+    seed-bound); Feistel half-width bug found and fixed by the
+    bijection tests.
+  - 16 JVM tests green: round-trips (empty/tiny/odd/chunk-boundary/
+    multi-chunk), wrong passphrase → typed NotACarrier, tamper →
+    typed failure, truncation → typed Truncated, bijection at even
+    and odd capacities, key-separation.
+
+
 ## [1.6.0-beta.1] - 2026-11-21 — GLASS REMOVED (prerelease)
 
 ### The decree
