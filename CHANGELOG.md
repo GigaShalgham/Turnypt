@@ -9,6 +9,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.7] - 2026-11-22 — ANY-FILE STEGO + THE CONTACT ECOSYSTEM (prerelease)
+
+### The decree
+
+"Why does the file-type restriction even exist? Add hidden-message
+hiding into EVERY file, and make every file of every extension carry
+a fully-secured hidden encrypted message automatically. Also make it
+a member of the Turnypt ecosystem — the same contacts system and the
+rest. And where you go to pick the file there are restrictions that
+really get on my nerves — tidy that place up as far as you can."
+
+### Added — the ANY carrier (`core/stego/AnyCarrier.kt`)
+
+- **Every file, every extension.** A third carrier family beside PNG
+  and WAV: the sealed CKS2 stream rides a CKE1 trailer APPENDED after
+  the file's original bytes — nothing inside the carrier is modified,
+  so every format whose parser tolerates trailing bytes works: PDF,
+  ZIP, APK, MP4, JPEG, GIF, TXT, SQLite, no-extension. The original
+  bytes are STREAMED through untouched (never buffered whole); only
+  the message-sized trailer is held in memory.
+- **One crypto engine for the whole family.** The trailer is sealed
+  with the SAME CKS2 two-key split (Argon2id → HKDF frame/payload
+  keys → AES-256-GCM chunks) the PNG/WAV carriers use — no new crypto,
+  no second code path to audit.
+- **Trailer layout** (big-endian): original bytes || random pad(0..15,
+  hides the trailer's alignment from length probes) || salt(16) ||
+  Cks2 FRAME(64) || sealed body || keyHint(16) || payloadLen(4) ||
+  magic "CKE1". Detection is O(1) from EOF; a wrong passphrase dies
+  at the frame's GCM tag — the same no-oracle `NotACarrier` failure
+  the sibling carriers use.
+- **JVM tests** (`AnyCarrierTest`, 8 cases): passphrase round-trip
+  over arbitrary bytes; one representative per format family (pdf/
+  zip/jpeg/mp4/txt/no-extension); wrong passphrase fails closed; a
+  file without a trailer is not a carrier; the ecosystem round-trip
+  through the era session key; a wrong keyHint resolves to no carrier;
+  original carrier bytes survive untouched.
+
+### Added — the Turnypt contact ecosystem (the second decree)
+
+- **Two key models on the stego screen** — a Contact key | Own
+  passphrase segment row in the SAME design language as the Hide |
+  Reveal pill:
+  - **Contact key (ecosystem, the decree):** the trailer's keyHint
+    records the era's PUBLIC keyId; the frame/payload keys derive by
+    HKDF over the contact's ACTIVE session key. Reveal resolves WHICH
+    CONTACT the file was hidden for from the keyHint through
+    `SessionKeyRepository.eraByKeyId` — the SAME resolution rule
+    CKF1 files use, superseded eras included (historical session).
+    A locked era surfaces the SAME unlock card every other flow
+    shows; a successful unlock RETRIES the extract automatically
+    (`pendingStegoExtract` continuation through `unlockAndContinue`).
+  - **Own passphrase (plan §4.4, kept):** the self-contained
+    container — the all-zero keyHint sentinel, Argon2id over the
+    passphrase + the trailer's own salt/nonces.
+- `StegoExtractOutcome.NeedsContactUnlock` joins the outcome
+  taxonomy; `StegoCipher` (repository facade) now consults
+  `ContactRepository`, `SessionKeyRepository` and
+  `KeySessionManager` — injected via the DI module.
+- PNG/WAV keep their pixel/sample paths when the sniffed signature
+  matches (the deep path); everything else — and the ecosystem route —
+  rides the ANY trailer. NO file is ever rejected by format.
+
+### Fixed — the file picker's "restrictions that get on my nerves"
+
+- The SAF `OpenDocument` launch now passes `*/*` — NO MIME filter.
+  Every file on the device is visible and pickable; the
+  previous four-type whitelist (image/png, audio/wav,
+  audio/x-wav, application/octet-stream) greyed out most of the
+  picker and is gone.
+- The carrier hint text now tells the truth: any file works, and the
+  file stays exactly what it was.
+
+### Build note
+
+- Maven Central AND Aliyun both failed from this sandbox on build day
+  (429 / 502); the Tencent mirror (mirrors.cloud.tencent.com,
+  verified 200) leads `settings.gradle.kts` — the same
+  mirror-fallback pattern the v1.5.9/v1.8.0 builds used.
+
 ## [1.6.0-beta.6] - 2026-11-22 — THE v1.5.10 GLASS DESIGN, RESTORED EVERYWHERE (prerelease)
 
 ### The decree

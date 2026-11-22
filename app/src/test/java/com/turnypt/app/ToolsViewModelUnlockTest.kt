@@ -420,6 +420,13 @@ class ToolsViewModelUnlockTest {
                         main = kotlinx.coroutines.Dispatchers.Unconfined,
                     ),
                     kdfParams = FAST_PARAMS,
+                    // v1.6.0-beta.7: the ANY carrier's ecosystem route
+                    // consults the same contact/session machinery the
+                    // app does — the test harness already holds fakes
+                    // for all three.
+                    contacts = contacts,
+                    sessionKeys = sessionKeys,
+                    sessions = sessions,
                 ),
             )
             viewModel = vm

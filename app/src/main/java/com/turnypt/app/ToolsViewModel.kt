@@ -160,6 +160,14 @@ data class ToolsUiState(
     val stegoExtracted: String? = null,
     /** The extract-mode toggle on the stego screen. */
     val stegoExtractMode: Boolean = false,
+    /**
+     * v1.6.0-beta.7: true when the stego screen rides the CONTACT
+     * ecosystem (hide-for-contact / reveal-for-contact) instead of the
+     * passphrase-only model — the user decree "member of the Turnypt
+     * ecosystem". The toggle re-uses the SAME selectedContactId /
+     * unlocked set the Encrypt tab uses.
+     */
+    val stegoEcosystemMode: Boolean = false,
     /** Extract-side failure detail (wrong passphrase / not a carrier). */
     val stegoNotice: com.turnypt.app.companion.UiNotice? = null,
 ) {
@@ -202,11 +210,19 @@ class ToolsViewModel @Inject constructor(
 
     /**
      * v0.6.0: the image operation that continues after a successful unlock
-     * (encrypt-to-target or decrypt-from-source). Takes precedence over the
-     * text continuation when set; kept across a failed unlock attempt so
+     * (encrypt-to-target or decrypt-from-source). Takes precedence over
+     * the text continuation when set; kept across a failed unlock attempt so
      * the user can retry with the right passphrase.
      */
     private var pendingImageOp: (suspend () -> Unit)? = null
+
+    /**
+     * v1.6.0-beta.7: true while a stego EXTRACT waits for the contact's
+     * unlock — the trailer named an era that is locked on this device,
+     * the unlock card was shown, and a successful unlock re-runs the
+     * extract (the same continuation discipline the image flows use).
+     */
+    private var pendingStegoExtract: Boolean = false
 
     /** The decrypted-image cache file owned by this ViewModel. */
     private var decryptCacheFile: File? = null
@@ -800,6 +816,19 @@ class ToolsViewModel @Inject constructor(
                                 CompanionMode.ENCRYPT -> encryptInternal(id, text)
                                 CompanionMode.DECRYPT -> decryptInternal(text)
                             }
+                        } else if (pendingStegoExtract) {
+                            // v1.6.0-beta.7: the ecosystem extract retries
+                            // with the contact now unlocked — the carrier
+                            // resolves the era, keys derive from the ACTIVE
+                            // session, no passphrase consulted.
+                            pendingStegoExtract = false
+                            _state.value = _state.value.copy(
+                                pendingContactId = null,
+                                unlockContactName = null,
+                            )
+                            _state.value.stegoCarrier?.let { carrier ->
+                                extractStegoInternal(carrier, CharArray(0))
+                            }
                         }
                     }
                     UnlockOutcome.WrongPassphrase -> _state.value = _state.value.copy(
@@ -1284,14 +1313,31 @@ class ToolsViewModel @Inject constructor(
         )
     }
 
+    /**
+     * v1.6.0-beta.7: toggles the stego screen's key model — the contact
+     * ecosystem (the user decree) or the passphrase-only container
+     * (plan §4.4). The ecosystem route re-uses the SAME selected contact
+     * and unlocked set the Encrypt tab uses.
+     */
+    fun setStegoEcosystemMode(ecosystem: Boolean) {
+        _state.value = _state.value.copy(
+            stegoEcosystemMode = ecosystem,
+            stegoResult = null,
+            stegoExtracted = null,
+            stegoNotice = null,
+        )
+    }
+
     fun dismissStegoNotice() {
         _state.value = _state.value.copy(stegoNotice = null)
     }
 
     /**
      * Embeds the typed message into the picked carrier, writing the
-     * result to [outputUri]. Passphrase-only per plan §4.4 — the selected
-     * contact is UX sugar only; NO session key is consulted.
+     * result to [outputUri]. Two key models (beta.7): the ECOSYSTEM route
+     * seals for the SELECTED contact's active era (the hide action is
+     * disabled until that contact is unlocked — same rule as text
+     * encrypt); the passphrase-only route stays self-contained (§4.4).
      */
     fun embedStegoTo(outputUri: Uri, message: String, passphrase: CharArray) {
         val carrier = _state.value.stegoCarrier ?: return
@@ -1299,9 +1345,10 @@ class ToolsViewModel @Inject constructor(
     }
 
     /**
-     * Extracts the hidden message from the picked carrier under the typed
-     * passphrase (plan §4.5: a wrong passphrase dies at the frame tag —
-     * the UI says "not a carrier", never "half right").
+     * Extracts the hidden message from the picked carrier. Ecosystem
+     * route: the carrier resolves the CONTACT from the trailer's keyHint;
+     * a locked era surfaces the SAME unlock card (extraction retries
+     * after unlock). Passphrase route: the typed passphrase is the key.
      */
     fun extractStegoFrom(passphrase: CharArray) {
         val carrier = _state.value.stegoCarrier ?: return
@@ -1332,14 +1379,24 @@ class ToolsViewModel @Inject constructor(
             )
             return
         }
+        // Ecosystem route: seal for the selected contact's ACTIVE era.
+        val contactId = if (_state.value.stegoEcosystemMode) {
+            _state.value.selectedContactId
+        } else {
+            null
+        }
         val outcome = try {
-            stegoCipher.embed(input, output, message.toByteArray(Charsets.UTF_8), passphrase)
+            stegoCipher.embed(
+                input, output, message.toByteArray(Charsets.UTF_8), passphrase,
+                contactId = contactId,
+            )
         } finally {
             runCatching { input.close() }
             runCatching { output.close() }
         }
         when (outcome) {
             is com.turnypt.data.repository.StegoEmbedOutcome.Embedded -> {
+                if (contactId != null) settings.setLastContactId(contactId.value)
                 _state.value = _state.value.copy(
                     stegoBusy = false,
                     stegoResult = StegoEmbedDone(
@@ -1381,10 +1438,19 @@ class ToolsViewModel @Inject constructor(
             )
             return
         }
+        // Ecosystem route: null passphrase tells the facade to resolve
+        // the CONTACT from the trailer's keyHint (and surface a lock
+        // card when needed). Passphrase route: the typed key. An EMPTY
+        // passphrase means the ecosystem continuation re-invoked us —
+        // the mode flag may have flipped, so the empty array routes the
+        // ecosystem path regardless.
+        val ecosystemRoute = _state.value.stegoEcosystemMode || passphrase.isEmpty()
+        val passphraseOrNull = if (ecosystemRoute) null else passphrase
         val outcome = try {
-            stegoCipher.extract(input, passphrase)
+            stegoCipher.extract(input, passphraseOrNull)
         } finally {
             runCatching { input.close() }
+            passphrase.wipe()
         }
         when (outcome) {
             is com.turnypt.data.repository.StegoExtractOutcome.Extracted -> {
@@ -1392,6 +1458,20 @@ class ToolsViewModel @Inject constructor(
                     stegoBusy = false,
                     stegoExtracted = String(outcome.message, Charsets.UTF_8),
                 )
+            }
+            is com.turnypt.data.repository.StegoExtractOutcome.NeedsContactUnlock -> {
+                _state.value = _state.value.copy(
+                    stegoBusy = false,
+                    unlockNeeded = true,
+                    pendingContactId = outcome.contactId,
+                    unlockContactName = outcome.contactName,
+                    // The stego continuation re-runs the extract after
+                    // the unlock — the SAME unlockAndContinue machinery
+                    // the image flows use.
+                    notice = null,
+                    stegoNotice = null,
+                )
+                pendingStegoExtract = true
             }
             com.turnypt.data.repository.StegoExtractOutcome.NotACarrier -> {
                 _state.value = _state.value.copy(
@@ -1415,6 +1495,7 @@ class ToolsViewModel @Inject constructor(
     override fun onCleared() {
         pendingText = null
         pendingImageOp = null
+        pendingStegoExtract = false
         // The decrypted-image preview cache dies with the ViewModel.
         decryptCacheFile?.delete()
         decryptCacheFile = null

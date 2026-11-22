@@ -206,15 +206,26 @@ object RepositoryModule {
         dispatchers = dispatchers,
     )
 
-    /** v1.6.0: the stego facade — passphrase-only key model (plan §4.4). */
+    /**
+     * v1.6.0-beta.7: the stego facade — the ANY carrier joins the family
+     * (every file, every extension) and the ecosystem key model rides
+     * the SAME contact/session machinery as text and files (plan §4.4's
+     * passphrase-only model stays as the second key model).
+     */
     @Provides
     @Singleton
     fun provideStegoCipher(
         random: ProtocolRandom,
         dispatchers: DispatcherProvider,
+        contacts: ContactRepository,
+        sessionKeys: SessionKeyRepository,
+        sessions: com.turnypt.core.sessions.KeySessionManager,
     ): StegoCipher = StegoCipher(
         random = random,
         dispatchers = dispatchers,
         kdfParams = StegoCipherDefaults.KDF_PARAMS,
+        contacts = contacts,
+        sessionKeys = sessionKeys,
+        sessions = sessions,
     )
 }
