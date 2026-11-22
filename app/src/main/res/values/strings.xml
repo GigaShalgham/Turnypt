@@ -386,7 +386,6 @@
     <string name="stego_mode_hide">Hide a message</string>
     <string name="stego_mode_reveal">Reveal a message</string>
     <string name="stego_carrier_hint_live">Pick a PNG image or a WAV audio file as the carrier. The file stays playable and viewable; the message rides inside.</string>
-    <string name="stego_carrier_clear">Change</string>
     <string name="stego_passphrase_title">Passphrase</string>
     <string name="stego_passphrase_label">Stego passphrase</string>
     <string name="stego_passphrase_hint">The passphrase is the only key (no contact or key era is used). Share it through a different channel — for example in person or via the encrypted text flow.</string>
@@ -401,6 +400,8 @@
     <string name="stego_tier_direct">Safest: direct transfer — USB, cloud drive, or any file copy. Bytes arrive exactly as they left.</string>
     <string name="stego_tier_document">Good: send as a DOCUMENT (file attachment). Telegram and WhatsApp keep document files byte-exact.</string>
     <string name="stego_tier_never">Never: send as a photo, audio or video message — messengers re-encode media and destroy the hidden bits.</string>
+    <string name="stego_result_saved_as">Saved as %1$s</string>
+    <string name="stego_result_details">%1$s carrier · message sealed with AES-256-GCM</string>
     <string name="settings_stego_matrix_title">Carrier capability matrix</string>
     <string name="settings_stego_matrix_intro">Which files can carry a hidden message, and how safely they travel.</string>
     <string name="settings_stego_matrix_png">PNG image — supported carrier. Lossless: survives any byte-exact transfer; re-encoding as photo destroys it.</string>

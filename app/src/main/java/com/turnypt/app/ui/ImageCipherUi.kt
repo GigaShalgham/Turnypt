@@ -98,6 +98,31 @@ fun ToolSegmentRow(
     imageSelected: Boolean,
     onTextSelected: () -> Unit,
     onImageSelected: () -> Unit,
+) = DualSegmentRow(
+    firstSelected = !imageSelected,
+    firstLabel = stringResource(R.string.segment_text),
+    firstIcon = TurnyptIcons.Lock,
+    onFirstSelected = onTextSelected,
+    secondLabel = stringResource(R.string.segment_image),
+    secondIcon = TurnyptIcons.Image,
+    onSecondSelected = onImageSelected,
+)
+
+/**
+ * v1.6.0-beta.5: the SAME sliding-pill segment control, parameterised
+ * for any two-option surface (extracted from ToolSegmentRow — the
+ * Text|Image switch's body, animation and 48dp invisible-button
+ * options unchanged; ToolSegmentRow now delegates to it).
+ */
+@Composable
+fun DualSegmentRow(
+    firstSelected: Boolean,
+    firstLabel: String,
+    firstIcon: ImageVector,
+    onFirstSelected: () -> Unit,
+    secondLabel: String,
+    secondIcon: ImageVector,
+    onSecondSelected: () -> Unit,
 ) {
     val shape = GlassRadii.pillShape
     // The indicator slides between the two halves of the track. v1.5.0
@@ -108,7 +133,7 @@ fun ToolSegmentRow(
     // carries a little settle (MediumBouncy) — the pill glides and lands
     // with a single soft overshoot, still quiet, still one layer.
     val indicatorFraction = animateFloatAsState(
-        targetValue = if (imageSelected) 1f else 0f,
+        targetValue = if (!firstSelected) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMediumLow,
@@ -144,17 +169,17 @@ fun ToolSegmentRow(
         }
         Row {
             SegmentOption(
-                label = stringResource(R.string.segment_text),
-                icon = TurnyptIcons.Lock,
-                selected = !imageSelected,
-                onClick = onTextSelected,
+                label = firstLabel,
+                icon = firstIcon,
+                selected = firstSelected,
+                onClick = onFirstSelected,
                 modifier = Modifier.weight(1f),
             )
             SegmentOption(
-                label = stringResource(R.string.segment_image),
-                icon = TurnyptIcons.Image,
-                selected = imageSelected,
-                onClick = onImageSelected,
+                label = secondLabel,
+                icon = secondIcon,
+                selected = !firstSelected,
+                onClick = onSecondSelected,
                 modifier = Modifier.weight(1f),
             )
         }

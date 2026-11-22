@@ -365,7 +365,6 @@
     <string name="stego_mode_hide">پنهان‌کردن پیام</string>
     <string name="stego_mode_reveal">آشکارسازی پیام</string>
     <string name="stego_carrier_hint_live">یک تصویر PNG یا یک فایل صوتی WAV را به‌عنوان حامل انتخاب کنید. فایل همچنان قابل‌مشاهده و پخش می‌ماند؛ پیام درون آن سوار می‌شود.</string>
-    <string name="stego_carrier_clear">تغییر</string>
     <string name="stego_passphrase_title">عبارت عبور</string>
     <string name="stego_passphrase_label">عبارت عبور استگانوگرافی</string>
     <string name="stego_passphrase_hint">عبارت عبور تنها کلید است (هیچ مخاطب یا دورکلیدی استفاده نمی‌شود). آن را از مسیری دیگر بدهید — مثلاً حضوری یا از طریق پیام متنی رمزشده.</string>
@@ -380,6 +379,8 @@
     <string name="stego_tier_direct">امن‌ترین راه: انتقال مستقیم — USB، درایو ابری یا هر کپی فایل. بایت‌ها همان‌طور که رفتند می‌رسند.</string>
     <string name="stego_tier_document">راه خوب: ارسال به‌صورت «سند/فایل». تلگرام و واتس‌اپ فایل‌های سند را بایت‌به‌بایت دست‌نخورده نگه می‌دارند.</string>
     <string name="stego_tier_never">هرگز: به‌صورت عکس، صوت یا ویدیو نفرستید — پیام‌رسان‌ها رسانه را بازکدگذاری می‌کنند و بیت‌های مخفی نابود می‌شوند.</string>
+    <string name="stego_result_saved_as">ذخیره‌شده به‌نام %1$s</string>
+    <string name="stego_result_details">حامل %1$s · پیام با AES-256-GCM مهروموم شد</string>
     <string name="settings_stego_matrix_title">ماتریس توانمندی فایل‌های حامل</string>
     <string name="settings_stego_matrix_intro">کدام فایل‌ها می‌توانند پیام مخفی حمل کنند و چگونه امن جابه‌جا می‌شوند.</string>
     <string name="settings_stego_matrix_png">تصویر PNG — حامل پشتیبانی‌شده. بدون‌افت: در هر انتقال بایت‌به‌بایت سالم می‌ماند؛ بازکدگذاری به‌صورت عکس نابودش می‌کند.</string>

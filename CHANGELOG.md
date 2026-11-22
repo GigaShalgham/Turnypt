@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.5] - 2026-11-22 — stego screen back in the v1.5.10 design (prerelease)
+
+### Redesign (user decree: "design like v1.5.10")
+
+- **StegoScreen rebuilt in the app's own component set**: the
+  `DualSegmentRow` sliding pill (Hide | Reveal, extracted from
+  `ToolSegmentRow` — the Text|Image switch's body, unchanged), the
+  same `SectionCard` sections, `PickedImageCard` for the chosen
+  carrier, `PassphraseInput` (field + live strength hint + action) for
+  the passphrase, `BusyLine`, `NoticeBanner` for failures, and
+  result cards shaped like `EncryptedFileCard` / `ResultBlock`
+  (Share-as-document + Clear / Copy + Clear).
+- Removed the bespoke two-button mode row, the raw OutlinedTextField
+  passphrase field, the hand-rolled error Text row, the custom
+  CarrierPickedRow and the always-open three-tier guidance stack —
+  the transfer guidance now rides the result card like every other
+  completion hint in the app.
+- No behavior change: SAF pick, passphrase-only embed/extract, and
+  the reveal flow are the beta.4 wiring untouched.
+
+
 ## [1.6.0-beta.4] - 2026-11-22 — stego Phase 1 COMPLETE (prerelease)
 
 ### Advanced cryptography plan — S3/S4/S5 (Phase 1 exit)
