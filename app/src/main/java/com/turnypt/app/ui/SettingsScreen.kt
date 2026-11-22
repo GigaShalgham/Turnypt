@@ -3,7 +3,6 @@ package com.turnypt.app.ui
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +51,9 @@ import com.turnypt.app.security.BiometricGate
 import com.turnypt.app.companion.UiNotice
 import com.turnypt.core.crypto.CipherAlgorithm
 import com.turnypt.data.preferences.CipherPreference
+import com.turnypt.app.ui.theme.GlassRadii
+import com.turnypt.app.ui.theme.LocalGlassTokens
+import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.security.policies.Argon2Profile
 import com.turnypt.security.policies.KeyPolicy
 
@@ -267,12 +269,14 @@ fun SettingsScreen(
             var cipherDialogOpen by remember { mutableStateOf(false) }
             // v1.4.0: the preference row reads as a raised glass plate
             // (tintHigh) — one tap target, same dialog behind it.
+            val glass = LocalGlassTokens.current
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        MaterialTheme.colorScheme.surfaceContainerHigh,
-                        MaterialTheme.shapes.small,
+                    .glassSurface(
+                        glass,
+                        GlassRadii.fieldShape,
+                        tint = glass.tintHigh,
                     )
                     .clickable(onClick = { cipherDialogOpen = true }),
             ) {
@@ -350,41 +354,6 @@ fun SettingsScreen(
         }
 
         // ------------------------------------------------ about
-        // v1.6.0 (stego plan S5): the carrier capability matrix.
-        SectionCard(
-            title = stringResource(R.string.settings_stego_matrix_title),
-            icon = TurnyptIcons.Shield,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    stringResource(R.string.settings_stego_matrix_intro),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(R.string.settings_stego_matrix_png),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(
-                    stringResource(R.string.settings_stego_matrix_wav),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(
-                    stringResource(R.string.settings_stego_matrix_jpeg),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(
-                    stringResource(R.string.settings_stego_matrix_mp4),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(
-                    stringResource(R.string.settings_stego_matrix_lossy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
         SectionCard(
             title = stringResource(R.string.settings_about_title),
             icon = TurnyptIcons.Info,
@@ -405,8 +374,10 @@ fun SettingsScreen(
             )
         }
 
-        // v1.6.0-beta.1: the glass-era clearance spacer is gone — the
-        // docked Scaffold NavigationBar reserves its own space.
-        Spacer(modifier = Modifier.height(8.dp))
+        // v1.5.6: the screen's own clearance under the floating glass bar
+        // (the NavHost viewport cut is gone; see TurnyptApp) — the last
+        // resting card clears the ~64dp pane, scrolled content slides
+        // beneath it.
+        Spacer(modifier = Modifier.height(96.dp))
     }
 }

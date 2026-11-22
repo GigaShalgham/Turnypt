@@ -1,7 +1,6 @@
 package com.turnypt.app.ui
 
 import android.content.Intent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +33,9 @@ import com.turnypt.app.MainViewModel
 import com.turnypt.app.R
 import com.turnypt.app.companion.DestinationRoute
 import com.turnypt.app.companion.EXTRA_FROM_CLIPBOARD
+import com.turnypt.app.ui.theme.GlassRadii
+import com.turnypt.app.ui.theme.LocalGlassTokens
+import com.turnypt.app.ui.theme.glassSurface
 
 /**
  * Home (v0.5, "Calm Vault"): brand header, one status card, one
@@ -70,13 +72,11 @@ fun HomeScreen(
         // rests in a primary-tinted medallion over the glass panel, the
         // name/tagline beside it. The hero is the one place Home carries
         // visual weight; everything below stays quiet.
+        val glass = LocalGlassTokens.current
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    MaterialTheme.colorScheme.surfaceContainerLow,
-                    MaterialTheme.shapes.large,
-                ),
+                .glassSurface(glass, GlassRadii.sheetShape),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -201,10 +201,9 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
-            // Stego frame (stego plan §6.1 S4): stego takes its place in
-            // Quick Access as a design preview — the tile routes to the
-            // UI skeleton while the system behind it (S0-S3 gates) is
-            // still being built.
+            // Stego (stego plan §6.1 S4): one tile routes into the Advanced
+            // encryption tab — the same glass tile every other quick
+            // action is.
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 QuickActionTile(
                     label = stringResource(R.string.home_quick_stego),
@@ -215,10 +214,11 @@ fun HomeScreen(
             }
         }
 
-        // v1.6.0-beta.1: the glass-era 96dp clearance spacer is gone —
-        // the docked Scaffold NavigationBar already reserves its own
-        // space through contentPadding, so the last tile rests at the
-        // natural bottom margin like every pre-glass screen did.
-        Spacer(modifier = Modifier.height(8.dp))
+        // v1.5.6: the NavHost no longer cuts its viewport above the bar,
+        // so THIS spacer is the screen's own clearance under the floating
+        // glass — 96dp clears the ~64dp pane plus its 12dp vertical inset
+        // with margin to spare, while scrolled content still slides
+        // beneath the translucent glass (nothing opaque between them).
+        Spacer(modifier = Modifier.height(96.dp))
     }
 }

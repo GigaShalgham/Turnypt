@@ -9,6 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.6] - 2026-11-22 — THE v1.5.10 GLASS DESIGN, RESTORED EVERYWHERE (prerelease)
+
+### The decree
+
+"I said about every fucking design not just that — the main menu and
+everything." beta.5 rebuilt the stego screen alone; beta.1 had torn the
+Liquid Glass language out of EVERY surface for a plain docked Material
+bar. This build restores the v1.5.10 design WHOLESALE: the thirteen
+UI/theme/companion files return to the exact v1.5.10 commit (`cbe7277`,
+"Perf v1.5.10: ship a real RELEASE build") — the floating glass pill
+main menu with its sliding selection pill, glass SectionCards and
+tiles, the two-tone backdrop, glass companion sheets, the Turnip
+identity, the v1.5.x insets and deferred-read animation tuning.
+
+### Restored (v1.5.10 wholesale)
+
+- TurnyptApp: the FLOATING GLASS PILL BAR (spring-animated sliding
+  selection pill, icon scale, label fade) over the full-bleed NavHost.
+- Glass.kt/Theme.kt: GlassColors/LocalGlassTokens, the tint/border/
+  highlight/backdrop model, Turnip palette, semantic channels.
+- Components/HomeScreen/ContactsScreen/SettingsScreen/EncryptScreen/
+  DecryptScreen/ImageCipherUi: glassSurface cards, tiles, chips,
+  banners, fields — every surface translucent again.
+- Companion sheets: applyWindowBackgroundBlur back (compositor-side,
+  API 31+ — NOT the per-frame alpha.5 RenderEffect pipeline, which
+  was the actual lag and stays dead).
+- v1.5.x behaviour kept: 280ms single-clock crossfades, status-bar
+  inset in the host, the 96dp glass-era clearances.
+
+### Kept on top (the stego feature, wired to the glass)
+
+- The six-tab floating bar: Advanced encryption (stego) slot restored
+  as a first-class destination; Home Quick Access tile; StegoScreen
+  rebuilt from the shared components (DualSegmentRow pill — extracted
+  from ToolSegmentRow, PickedImageCard, PassphraseInput, NoticeBanner,
+  BusyLine, EncryptedFileCard-shaped result) at beta.5 wiring: SAF
+  pick, passphrase-only Cks2 embed into PNG/WAV, two-step reveal.
+- gradle heap back to the v1.5.10 sizes (the sandbox's tight -Xmx
+  1152m was a build-box constraint, not an app change).
+
+
 ## [1.6.0-beta.5] - 2026-11-22 — stego screen back in the v1.5.10 design (prerelease)
 
 ### Redesign (user decree: "design like v1.5.10")

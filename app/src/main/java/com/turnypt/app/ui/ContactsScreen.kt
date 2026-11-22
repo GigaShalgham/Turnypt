@@ -1,7 +1,6 @@
 package com.turnypt.app.ui
 
 import android.content.Intent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,6 +54,9 @@ import com.turnypt.app.companion.UiNotice
 import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.security.BiometricPromptHost
 import com.turnypt.app.security.rememberBiometricPromptHelper
+import com.turnypt.app.ui.theme.GlassRadii
+import com.turnypt.app.ui.theme.LocalGlassTokens
+import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.data.repository.Contact
 import com.turnypt.data.repository.UnlockOutcome
 import com.turnypt.security.policies.Argon2Profile
@@ -106,19 +108,25 @@ fun ContactsScreen(viewModel: ContactsViewModel, biometrics: BiometricKeyStore) 
             // v0.5: a real extended FAB (icon + label) — the v0.3–v0.4
             // pseudo-FAB was a bare TextButton that read as a list action.
             // v1.5.8 (user report: "the add-contact button sits UNDER the
-            // floating menu and is not properly visible") — historical
-            // note, kept short: the old fix pushed the FAB above the
-            // glass pane with 96dp of bottom padding. v1.6.0-beta.1:
-            // the pane is gone, the Scaffold's docked NavigationBar owns
-            // the foot again, and the FAB sits at the standard dock with
-            // no manual clearance.
+            // floating menu and is not properly visible"): the FAB docked
+            // at the raw screen foot — Scaffold only reserves
+            // navigation-bar insets for it, and the floating glass bar
+            // (12dp stand-off + ~64dp pane + 6dp inner padding) floats
+            // OVER that same foot as an overlay, not as a Scaffold bar —
+            // so the FAB rendered beneath the pane, effectively hidden.
+            // It now carries the bar's own stand-off height as bottom
+            // padding, placing it flush ABOVE the pane exactly as the
+            // list's trailing spacer (96dp, v1.5.6) already clears it —
+            // same RTL-safe end-anchored docking, just visibly clear of
+            // the glass. No other screen has a FAB, so nothing else
+            // moves.
             ExtendedFloatingActionButton(
                 text = { Text(stringResource(R.string.contacts_add_contact)) },
                 icon = { Icon(TurnyptIcons.Add, contentDescription = null) },
                 onClick = { showAddDialog = true },
                 modifier = Modifier
                     .padding(end = 12.dp)
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 96.dp),
             )
         },
     ) { padding ->
@@ -163,10 +171,11 @@ fun ContactsScreen(viewModel: ContactsViewModel, biometrics: BiometricKeyStore) 
                             },
                         )
                     }
-                    // v1.6.0-beta.1: the glass-era clearance item is gone —
-                    // the docked bar reserves its space; the last card
-                    // rests at the natural bottom margin.
-                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                    // v1.5.6: the list's own clearance under the floating
+                    // glass bar (the NavHost viewport cut is gone; see
+                    // TurnyptApp) — the last resting card clears the
+                    // ~64dp pane, scrolled cards slide beneath it.
+                    item { Spacer(modifier = Modifier.height(96.dp)) }
                 }
             }
         }
@@ -233,13 +242,11 @@ private fun ContactCard(
     eraCount: Int,
     onClick: () -> Unit,
 ) {
+    val glass = LocalGlassTokens.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.surfaceContainerLow,
-                MaterialTheme.shapes.medium,
-            )
+            .glassSurface(glass, GlassRadii.cardShape)
             .clickable(onClick = onClick),
     ) {
         Row(

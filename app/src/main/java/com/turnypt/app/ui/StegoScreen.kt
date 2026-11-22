@@ -283,8 +283,9 @@ fun StegoScreen(viewModel: ToolsViewModel) {
         // Stego failures ride the SAME NoticeBanner every tab uses.
         NoticeBanner(state.stegoNotice)
 
-        // v1.6.0-beta.1: the glass-era clearance spacer is gone — the
-        // docked Scaffold NavigationBar reserves its own space.
-        Spacer(modifier = Modifier.height(8.dp))
+        // v1.5.6: the screen's own clearance under the floating glass
+        // bar — 96dp clears the ~64dp pane plus its 12dp vertical inset,
+        // while scrolled content still slides beneath the glass.
+        Spacer(modifier = Modifier.height(96.dp))
     }
 }

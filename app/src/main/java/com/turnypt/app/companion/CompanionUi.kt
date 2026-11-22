@@ -1,6 +1,5 @@
 package com.turnypt.app.companion
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +45,9 @@ import androidx.compose.ui.unit.sp
 import com.turnypt.app.R
 import com.turnypt.app.ui.PassphraseStrengthHint
 import com.turnypt.app.ui.SuggestPassphraseSection
+import com.turnypt.app.ui.theme.GlassRadii
+import com.turnypt.app.ui.theme.LocalGlassTokens
+import com.turnypt.app.ui.theme.glassSurface
 import com.turnypt.app.security.rememberBiometricPromptHelper
 import com.turnypt.app.security.BiometricPromptHost
 import com.turnypt.core.common.ContactId
@@ -228,12 +230,14 @@ private fun EncryptPrepareCard(
         )
         // v1.4.0: the incoming draft rests on a raised glass plate —
         // selectable, bounded, depth over the sheet's own glass.
+        val glass = LocalGlassTokens.current
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    MaterialTheme.colorScheme.surfaceContainerHigh,
-                    MaterialTheme.shapes.small,
+                .glassSurface(
+                    glass,
+                    GlassRadii.fieldShape,
+                    tint = glass.tintHigh,
                 ),
         ) {
             Text(
