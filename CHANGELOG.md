@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.3] - 2026-11-22 — stego S2 lands (prerelease)
+
+### Advanced cryptography plan — S2 (image carrier)
+
+- **PngCarrier** (plan §3.2/§6.1 S2): ±1 LSB matching over the RGB
+  channels (alpha never touched); pixel delta <= 1 per channel by
+  construction; boundary values (0/255) degrade to overwrite (the
+  standard ±1 caveat, ~2/256 values).
+- **PngStegoCipher facade**: two-zone embed — the salt(16B)+frame(64B)
+  prefix rides sequential slots at the front (plan §4.2 "read exactly
+  the 64-byte frame from the front"), the sealed body rides the keyed
+  BitSpread positions over the remaining space (plan §4.3). Zones are
+  disjoint by construction; an earlier overlapping-zone design was
+  caught by the zone probe (single flipped salt bit) and fixed.
+- **CapacityPlanner**: pre-flight fit/headroom math so CarrierTooSmall
+  is a UI state, not a runtime surprise (plan §6.3 risk table).
+- 10 new JVM tests green: message/empty round-trips, delta<=1,
+  wrong-passphrase NotACarrier, CarrierTooSmall pre-flight, planner
+  math, ±1 contract, per-passphrase spread separation, bijection
+  diagnostic at capacity 12288.
+
+
 ## [1.6.0-beta.2] - 2026-11-21 — stego S1 lands (prerelease)
 
 ### Fixed (the beta.1 glass-revert leftovers)
