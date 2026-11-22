@@ -150,8 +150,19 @@ data class ToolsUiState(
     val resolvedCipherName: String? = null,
 
     // ------------------------------------------------------ v1.6.0 stego
-    /** The carrier picked for stego embed/extract (SAF). */
-    val stegoCarrier: StegoCarrierSource? = null,
+    /**
+     * v1.6.0-beta.8 (user report: "the carrier file is shared between
+     * hide and reveal"): the HIDE side's own carrier — whatever file the
+     * user picked on the Hide half. Completely independent from the
+     * reveal side's pick; toggling the segment never carries one into
+     * the other.
+     */
+    val stegoHideCarrier: StegoCarrierSource? = null,
+    /**
+     * v1.6.0-beta.8: the REVEAL side's own carrier — the file the user
+     * suspects carries a hidden message. Independent from the hide pick.
+     */
+    val stegoRevealCarrier: StegoCarrierSource? = null,
     /** True while a stego embed/extract runs. */
     val stegoBusy: Boolean = false,
     /** A finished embed: output URI + kind (the share-ready card). */
@@ -167,7 +178,7 @@ data class ToolsUiState(
      * ecosystem". The toggle re-uses the SAME selectedContactId /
      * unlocked set the Encrypt tab uses.
      */
-    val stegoEcosystemMode: Boolean = false,
+    val stegoEcosystemMode: Boolean = true,
     /** Extract-side failure detail (wrong passphrase / not a carrier). */
     val stegoNotice: com.turnypt.app.companion.UiNotice? = null,
 ) {
@@ -821,12 +832,15 @@ class ToolsViewModel @Inject constructor(
                             // with the contact now unlocked — the carrier
                             // resolves the era, keys derive from the ACTIVE
                             // session, no passphrase consulted.
+                            // v1.6.0-beta.8: the retry rides the REVEAL
+                            // side's own carrier (the trailer that named
+                            // the contact was picked on the Reveal half).
                             pendingStegoExtract = false
                             _state.value = _state.value.copy(
                                 pendingContactId = null,
                                 unlockContactName = null,
                             )
-                            _state.value.stegoCarrier?.let { carrier ->
+                            _state.value.stegoRevealCarrier?.let { carrier ->
                                 extractStegoInternal(carrier, CharArray(0))
                             }
                         }
@@ -1280,33 +1294,66 @@ class ToolsViewModel @Inject constructor(
 
 
     // ------------------------------------------------- v1.6.0 stego ops
-    /** The carrier the user picked (SAF OpenDocument). */
-    fun pickStegoCarrier(uri: Uri, displayName: String?, sizeBytes: Long?, mime: String?) {
-        _state.value = _state.value.copy(
-            stegoCarrier = StegoCarrierSource(
-                uriString = uri.toString(),
-                displayName = displayName?.takeIf { it.isNotBlank() } ?: "carrier",
-                sizeBytes = sizeBytes,
-                mime = mime,
-            ),
-            stegoResult = null,
-            stegoExtracted = null,
-            stegoNotice = null,
+    /**
+     * The carrier the user picked (SAF OpenDocument). v1.6.0-beta.8:
+     * [forReveal] routes the pick to the REVEAL side's own slot — the
+     * hide and reveal halves each keep their own carrier, independent.
+     */
+    fun pickStegoCarrier(
+        uri: Uri,
+        displayName: String?,
+        sizeBytes: Long?,
+        mime: String?,
+        forReveal: Boolean,
+    ) {
+        val carrier = StegoCarrierSource(
+            uriString = uri.toString(),
+            displayName = displayName?.takeIf { it.isNotBlank() } ?: "carrier",
+            sizeBytes = sizeBytes,
+            mime = mime,
         )
+        _state.value = if (forReveal) {
+            _state.value.copy(
+                stegoRevealCarrier = carrier,
+                stegoExtracted = null,
+                stegoNotice = null,
+            )
+        } else {
+            _state.value.copy(
+                stegoHideCarrier = carrier,
+                stegoResult = null,
+                stegoNotice = null,
+            )
+        }
     }
 
-    fun clearStegoCarrier() {
-        _state.value = _state.value.copy(
-            stegoCarrier = null,
-            stegoResult = null,
-            stegoExtracted = null,
-            stegoNotice = null,
-        )
+    /**
+     * v1.6.0-beta.8: clears ONE side's carrier. [forReveal] clears the
+     * reveal pick (and its extracted message); the default clears the
+     * hide pick (and its result card).
+     */
+    fun clearStegoCarrier(forReveal: Boolean = false) {
+        _state.value = if (forReveal) {
+            _state.value.copy(
+                stegoRevealCarrier = null,
+                stegoExtracted = null,
+                stegoNotice = null,
+            )
+        } else {
+            _state.value.copy(
+                stegoHideCarrier = null,
+                stegoResult = null,
+                stegoNotice = null,
+            )
+        }
     }
 
     fun setStegoExtractMode(extract: Boolean) {
         _state.value = _state.value.copy(
             stegoExtractMode = extract,
+            // v1.6.0-beta.8: switching halves keeps BOTH carriers where
+            // they are — each side's pick stays its own; only that side's
+            // transient outputs reset.
             stegoResult = null,
             stegoExtracted = null,
             stegoNotice = null,
@@ -1318,10 +1365,14 @@ class ToolsViewModel @Inject constructor(
      * ecosystem (the user decree) or the passphrase-only container
      * (plan §4.4). The ecosystem route re-uses the SAME selected contact
      * and unlocked set the Encrypt tab uses.
+     *
+     * v1.6.0-beta.8 (user decree): the passphrase-only model is RETIRED
+     * from the stego screen — "remove my own passphrase, contacts only".
+     * The flag now always reads TRUE; the setter accepts only true.
      */
     fun setStegoEcosystemMode(ecosystem: Boolean) {
         _state.value = _state.value.copy(
-            stegoEcosystemMode = ecosystem,
+            stegoEcosystemMode = true,
             stegoResult = null,
             stegoExtracted = null,
             stegoNotice = null,
@@ -1334,24 +1385,26 @@ class ToolsViewModel @Inject constructor(
 
     /**
      * Embeds the typed message into the picked carrier, writing the
-     * result to [outputUri]. Two key models (beta.7): the ECOSYSTEM route
-     * seals for the SELECTED contact's active era (the hide action is
-     * disabled until that contact is unlocked — same rule as text
-     * encrypt); the passphrase-only route stays self-contained (§4.4).
+     * result to [outputUri]. v1.6.0-beta.8 (user decree): the ONLY key
+     * model is the ECOSYSTEM route — the seal is for the SELECTED
+     * contact's active era (the hide action is disabled until that
+     * contact is unlocked, same rule as text encrypt). The passphrase
+     * parameter is kept in the signature for the unlock continuation
+     * only; the own-passphrase model is gone.
      */
     fun embedStegoTo(outputUri: Uri, message: String, passphrase: CharArray) {
-        val carrier = _state.value.stegoCarrier ?: return
+        val carrier = _state.value.stegoHideCarrier ?: return
         launchSafely { embedStegoInternal(carrier, outputUri, message, passphrase) }
     }
 
     /**
-     * Extracts the hidden message from the picked carrier. Ecosystem
-     * route: the carrier resolves the CONTACT from the trailer's keyHint;
-     * a locked era surfaces the SAME unlock card (extraction retries
-     * after unlock). Passphrase route: the typed passphrase is the key.
+     * Extracts the hidden message from the picked carrier. v1.6.0-beta.8:
+     * the reveal side has its OWN carrier slot — the carrier resolved
+     * from the trailer's keyHint names the contact; a locked era surfaces
+     * the SAME unlock card (extraction retries after unlock).
      */
     fun extractStegoFrom(passphrase: CharArray) {
-        val carrier = _state.value.stegoCarrier ?: return
+        val carrier = _state.value.stegoRevealCarrier ?: return
         launchSafely { extractStegoInternal(carrier, passphrase) }
     }
 
@@ -1364,35 +1417,37 @@ class ToolsViewModel @Inject constructor(
         _state.value = _state.value.copy(stegoBusy = true, notice = null, stegoNotice = null)
         val input = streams.read(Uri.parse(carrier.uriString))
         if (input == null) {
+            passphrase.wipe()
             _state.value = _state.value.copy(
                 stegoBusy = false,
-                stegoNotice = null,
+                stegoNotice = stegoMsg(R.string.stego_err_open_failed),
             )
             return
         }
         val output = streams.write(outputUri)
         if (output == null) {
             runCatching { input.close() }
+            passphrase.wipe()
             _state.value = _state.value.copy(
                 stegoBusy = false,
-                stegoNotice = null,
+                stegoNotice = stegoMsg(R.string.stego_err_write_failed),
             )
             return
         }
-        // Ecosystem route: seal for the selected contact's ACTIVE era.
-        val contactId = if (_state.value.stegoEcosystemMode) {
-            _state.value.selectedContactId
-        } else {
-            null
-        }
+        // v1.6.0-beta.8 (user decree): the ECOSYSTEM route is the only
+        // route — the seal is for the selected contact's ACTIVE era. The
+        // passphrase argument of embedStegoTo is ignored on purpose (the
+        // own-passphrase model was removed from the stego screen).
+        val contactId = _state.value.selectedContactId
         val outcome = try {
             stegoCipher.embed(
-                input, output, message.toByteArray(Charsets.UTF_8), passphrase,
+                input, output, message.toByteArray(Charsets.UTF_8), CharArray(0),
                 contactId = contactId,
             )
         } finally {
             runCatching { input.close() }
             runCatching { output.close() }
+            passphrase.wipe()
         }
         when (outcome) {
             is com.turnypt.data.repository.StegoEmbedOutcome.Embedded -> {
@@ -1432,19 +1487,18 @@ class ToolsViewModel @Inject constructor(
         _state.value = _state.value.copy(stegoBusy = true, notice = null, stegoNotice = null)
         val input = streams.read(Uri.parse(carrier.uriString))
         if (input == null) {
+            passphrase.wipe()
             _state.value = _state.value.copy(
                 stegoBusy = false,
                 stegoNotice = stegoMsg(R.string.stego_err_open_failed),
             )
             return
         }
-        // Ecosystem route: null passphrase tells the facade to resolve
-        // the CONTACT from the trailer's keyHint (and surface a lock
-        // card when needed). Passphrase route: the typed key. An EMPTY
-        // passphrase means the ecosystem continuation re-invoked us —
-        // the mode flag may have flipped, so the empty array routes the
-        // ecosystem path regardless.
-        val ecosystemRoute = _state.value.stegoEcosystemMode || passphrase.isEmpty()
+        // v1.6.0-beta.8 (user decree): the ONLY route — the trailer's
+        // keyHint resolves the CONTACT and the era keys derive from the
+        // active session; a locked era surfaces the unlock card. An EMPTY
+        // passphrase means the unlock continuation re-invoked us.
+        val ecosystemRoute = true
         val passphraseOrNull = if (ecosystemRoute) null else passphrase
         val outcome = try {
             stegoCipher.extract(input, passphraseOrNull)

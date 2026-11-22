@@ -122,6 +122,14 @@ fun DecryptScreen(
                     onValueChange = { input = it },
                     placeholder = { Text(stringResource(R.string.decrypt_input_hint)) },
                     minLines = 3,
+                    // v1.6.0-beta.8 (user decree): every text input gets a
+                    // Done key — tapping it closes the keyboard.
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onDone = { },
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (envelopeDetected) {

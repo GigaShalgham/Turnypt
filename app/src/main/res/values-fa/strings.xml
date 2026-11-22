@@ -365,12 +365,10 @@
     <string name="stego_mode_hide">پنهان‌کردن پیام</string>
     <string name="stego_mode_reveal">آشکارسازی پیام</string>
     <string name="stego_carrier_hint_live">هر فایلی کار می‌کند — تصویر، صدا، ویدیو، سند، آرشیو، یا حتی بدون پسوند. فایل دقیقاً همان چیزی می‌ماند که بود؛ پیام مهروموم‌شده بعد از بایت‌هایش سوار می‌شود.</string>
-    <string name="stego_passphrase_title">عبارت عبور</string>
-    <string name="stego_passphrase_label">عبارت عبور استگانوگرافی</string>
-    <string name="stego_passphrase_hint">عبارت عبور تنها کلید است (هیچ مخاطب یا دورکلیدی استفاده نمی‌شود). آن را از مسیری دیگر بدهید — مثلاً حضوری یا از طریق پیام متنی رمزشده.</string>
-    <string name="stego_key_model_title">مدل کلید</string>
-    <string name="stego_key_contact">کلید مخاطب</string>
-    <string name="stego_key_passphrase">عبارت عبور خودم</string>
+    <!-- v1.6.0-beta.8 (فرمان کاربر): مدل «عبارت عبور خودم» از صفحه استگانو حذف شد — فقط مخاطب. -->
+    <string name="stego_key_model_title">مخاطب</string>
+    <string name="stego_reveal_carrier_hint_live">فایلی را برگزینید که به پنهان‌بودن پیام در آن مشکوکید — این انتخاب کاملاً جدا از فایل حاملِ بخش پنهان‌کردن است.</string>
+    <string name="stego_pick_reveal_carrier">انتخاب فایل برای آشکارسازی</string>
     <string name="stego_locked_hint">این مخاطب قفل است. اول با عبارت عبور مشترک بازش کنید — همان کارتی که سربرگ رمزنگاری دارد.</string>
     <string name="stego_ecosystem_hint">پیام مخفی برای دورکلیدیِ همین مخاطب مهروموم می‌شود — گیرنده با همان عبارت عبور مشترک بازش می‌کند، درست مثل متن‌ها و فایل‌های رمزشده.</string>
     <string name="stego_reveal_ecosystem_hint">خود فایل می‌گوید برای کدام مخاطب پنهان شده. اگر آن مخاطب اینجا قفل باشد، کارت بازکردن ظاهر می‌شود و آشکارسازی خودکار ادامه پیدا می‌کند.</string>

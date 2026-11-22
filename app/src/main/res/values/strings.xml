@@ -386,12 +386,18 @@
     <string name="stego_mode_hide">Hide a message</string>
     <string name="stego_mode_reveal">Reveal a message</string>
     <string name="stego_carrier_hint_live">Any file works — image, audio, video, document, archive, or no extension at all. The file stays exactly what it was; the sealed message rides after its bytes.</string>
+    <!-- v1.6.0-beta.8 (user decree): the own-passphrase model is RETIRED
+         from the stego screen — contacts only. The stego_passphrase_*
+         trio is kept for compatibility with older translations but no
+         longer referenced by the stego screen. -->
     <string name="stego_passphrase_title">Passphrase</string>
     <string name="stego_passphrase_label">Stego passphrase</string>
     <string name="stego_passphrase_hint">The passphrase is the only key (no contact or key era is used). Share it through a different channel — for example in person or via the encrypted text flow.</string>
-    <string name="stego_key_model_title">Key model</string>
+    <string name="stego_key_model_title">Contact</string>
     <string name="stego_key_contact">Contact key</string>
     <string name="stego_key_passphrase">Own passphrase</string>
+    <string name="stego_reveal_carrier_hint_live">Pick the file you suspect carries a hidden message — this pick is completely separate from the Hide side\'s carrier.</string>
+    <string name="stego_pick_reveal_carrier">Choose file to reveal</string>
     <string name="stego_locked_hint">This contact is locked. Unlock with the shared passphrase first — the same card the Encrypt tab uses.</string>
     <string name="stego_ecosystem_hint">The hidden message is sealed for this contact\'s key era — the receiver unlocks it with the shared passphrase, exactly like encrypted texts and files.</string>
     <string name="stego_reveal_ecosystem_hint">The file itself names the contact it was hidden for. If that contact is locked here, the unlock card appears and the reveal retries automatically.</string>

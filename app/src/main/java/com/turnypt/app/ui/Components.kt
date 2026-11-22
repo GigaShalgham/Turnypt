@@ -437,6 +437,12 @@ fun PassphraseInput(
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                 keyboardType = KeyboardType.Password,
+                // v1.6.0-beta.8 (user decree): every text input gets a
+                // Done key — tapping it closes the keyboard.
+                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+            ),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                onDone = { },
             ),
             modifier = Modifier.fillMaxWidth(),
         )

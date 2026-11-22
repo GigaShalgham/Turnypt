@@ -9,6 +9,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.8] - 2026-11-22 — THE SEVEN-REPORT POLISH PASS (prerelease)
+
+### The decree
+
+Seven user reports on the beta.7 build, fixed in one pass: "Remove my
+own passphrase — contacts only"; "why is the carrier file shared
+between hide and reveal"; "the share button you put there does not send
+it as a file, e.g. the song"; "that page has no fingerprint button";
+"remove image encryption from the floating assistant too"; "when a
+contact is created and it says 'contact created', then you leave the
+page and come back, it should be gone — and it must not stick to the
+contact"; and "for every page that has a text input, put a confirm
+button that closes the keyboard when tapped".
+
+### Removed — the stego own-passphrase model (contacts only)
+
+- The **Contact key | Own passphrase** segment pair on the stego screen
+  is gone. Every seal rides a contact's key era; every reveal resolves
+  the contact from the trailer. The stego facade keeps the
+  passphrase-only embed API for compatibility, but the screen never
+  sends it.
+- The floating assistant's **Encrypt image** row is gone (the in-app
+  Encrypt tab keeps its image segment).
+
+### Fixed — stego screen
+
+- **Separate carriers.** The Hide half and the Reveal half each have
+  their OWN carrier pick; toggling the segment never carries one file
+  into the other half. New strings `stego_pick_reveal_carrier` /
+  `stego_reveal_carrier_hint_live` (EN + FA).
+- **Share sends the real file.** The result card's Share button copies
+  the SAF output into the app cache and shares it through the app's
+  FileProvider with the carrier's OWN advertised MIME (audio/* for a
+  song, image/* for a picture) — receivers see a genuine FILE of the
+  type they already handle, not an anonymous octet-stream blob. A
+  >256 MiB output falls back to a direct SAF grant share, still typed.
+- **Fingerprint on the stego screen.** The BiometricPromptHost and the
+  "Use fingerprint" button the Encrypt/Decrypt tabs show now live on
+  the stego screen's locked-contact cards (hide and reveal sides).
+- **Uniform ecosystem route.** With the passphrase model retired, a
+  PNG or WAV carrier hides through the SAME CKE1 trailer as every
+  other file (the pixel paths had no room for an era keyId, so under
+  the decree they were unreachable; the facade now routes every
+  contact-keyed embed through ANY).
+- **Honest locked-era reveal.** A trailer naming an era that is not
+  unlocked on this device used to fall into the misleading "no hidden
+  message found" notice; the facade now surfaces
+  `NeedsContactUnlock` (the unlock card + automatic retry) with the
+  contact the trailer itself named.
+
+### Fixed — contacts
+
+- **One-shot "Contact created".** The success banner now auto-dismisses
+  after 4s and is consumed on the first re-entry into the Contacts tab
+  — a returning user never sees a stale "created" (or "deleted") line,
+  and the banner never reappears. (The banner lived in ViewModel state
+  for as long as the ViewModel survived — "stuck to the contact".)
+
+### Added — IME confirm keys (every text input)
+
+- Every text field in the app now carries a keyboard confirm key:
+  single-line fields get **Done** (tap it, the keyboard closes),
+  the add-contact form's name field gets **Next** (jumps to the invite
+  field), and every multi-line draft (Encrypt/Decrypt/Stego message)
+  gets **Done**. Passphrase fields (unlock cards, dialogs, companion)
+  get **Done** too.
+
 ## [1.6.0-beta.7] - 2026-11-22 — ANY-FILE STEGO + THE CONTACT ECOSYSTEM (prerelease)
 
 ### The decree

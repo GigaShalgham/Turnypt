@@ -39,7 +39,6 @@ import com.turnypt.app.R
 import com.turnypt.app.companion.EXTRA_FROM_CLIPBOARD
 import com.turnypt.app.companion.DecryptActivity
 import com.turnypt.app.companion.EncryptActivity
-import com.turnypt.app.companion.ImageCipherActivity
 import com.turnypt.data.preferences.SettingsRepository
 import com.turnypt.data.repository.MessageCipher
 
@@ -233,15 +232,10 @@ class FloatingAssistantService : Service() {
                     density = density,
                 ) { launchClipboardFlow(encrypt = false) },
             )
-            // v0.6.0: images take their place in the assistant too — same
-            // engine as the in-app tabs (the sheet picks the image itself).
-            addView(
-                panelRow(
-                    iconRes = R.drawable.ic_assistant_image,
-                    labelRes = R.string.assistant_encrypt_image,
-                    density = density,
-                ) { launchImageFlow() },
-            )
+            // v1.6.0-beta.8 (user decree: "remove image encryption from
+            // the floating assistant too"): the Encrypt-image row is gone
+            // from the panel. The in-app Encrypt tab keeps its image
+            // segment; the assistant stays a text-clipboard tool.
             addView(
                 panelRow(
                     iconRes = R.drawable.ic_assistant_lock_all,
@@ -498,17 +492,6 @@ class FloatingAssistantService : Service() {
             if (encrypt) EncryptActivity::class.java else DecryptActivity::class.java,
         )
             .putExtra(EXTRA_FROM_CLIPBOARD, true)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { startActivity(intent) }
-    }
-
-    /**
-     * v0.6.0: the image companion in picker mode — the sheet opens the
-     * SAF image picker itself, so this row works from anywhere.
-     */
-    private fun launchImageFlow() {
-        collapsePanel()
-        val intent = Intent(this, ImageCipherActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { startActivity(intent) }
     }

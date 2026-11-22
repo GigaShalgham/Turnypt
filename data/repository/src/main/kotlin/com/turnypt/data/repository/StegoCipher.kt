@@ -105,11 +105,14 @@ class StegoCipher(
      * Embeds [message] into the carrier read from [source], writing the
      * carrier WITH the hidden stream to [target].
      *
-     * Key routing: [contactId] non-null selects the ECOSYSTEM model (the
-     * era must be unlocked on this device — the caller checked). Null
-     * selects PASSPHRASE-ONLY. The PNG/WAV pixel paths always use the
-     * passphrase model (the trailer has no room in pixel space; the
-     * ecosystem route works through the ANY path).
+     * Key routing (v1.6.0-beta.8, user decree "remove my own passphrase —
+     * contacts only"): [contactId] non-null selects the ECOSYSTEM model
+     * and routes EVERY sniffed format — PNG and WAV included — through
+     * the ANY EOF-append trailer (the trailer is the only place an era
+     * keyId fits; the pixel paths have no room for one, and with the
+     * passphrase model retired from the screen they would otherwise be
+     * unreachable). Null [contactId] keeps the legacy PASSPHRASE-ONLY
+     * model for API compatibility (the screen never sends it now).
      */
     suspend fun embed(
         source: InputStream,
@@ -126,7 +129,12 @@ class StegoCipher(
         }
         val sniffed = sniffCarrier(bytes)
         try {
-            if (deepPixelPath && sniffed == StegoCarrierKind.PNG) {
+            if (contactId != null) {
+                // v1.6.0-beta.8: the ecosystem route is uniform — the
+                // CKE1 trailer rides EVERY carrier (PNG/WAV bytes stay
+                // untouched before it, exactly like any other file).
+                embedAnyEcosystem(bytes, target, message, contactId)
+            } else if (deepPixelPath && sniffed == StegoCarrierKind.PNG) {
                 val out = embedPng(bytes, message, passphrase)
                     ?: return@withContext passThrough(bytes, target)
                 out.second.compress(Bitmap.CompressFormat.PNG, 100, target)
@@ -145,22 +153,17 @@ class StegoCipher(
                     bytes.size.toLong(),
                 )
             } else {
-                // ANY — every other file (and the ecosystem route):
+                // ANY — every other file (passphrase model, legacy API):
                 // EOF-append, original bytes streamed through untouched.
-                if (contactId != null) {
-                    embedAnyEcosystem(bytes, target, message, contactId)
-                } else {
-                    // The stream source is re-wrapped from the buffer.
-                    AnyCarrier.append(
-                        java.io.ByteArrayInputStream(bytes), target,
-                        message, passphrase, null, null, kdfParams,
-                    )
-                    StegoEmbedOutcome.Embedded(
-                        StegoCarrierKind.ANY,
-                        message.size,
-                        bytes.size.toLong(),
-                    )
-                }
+                AnyCarrier.append(
+                    java.io.ByteArrayInputStream(bytes), target,
+                    message, passphrase, null, null, kdfParams,
+                )
+                StegoEmbedOutcome.Embedded(
+                    StegoCarrierKind.ANY,
+                    message.size,
+                    bytes.size.toLong(),
+                )
             }
         } catch (e: StegoError.CarrierTooSmall) {
             passThrough(bytes, target).let {
@@ -195,6 +198,12 @@ class StegoCipher(
         }
         // ANY first: a CKE1 trailer is detectable on EVERY file, and a
         // PNG/WAV carrying a trailer (not pixel-embedded) must route here.
+        // v1.6.0-beta.8: the trailer's keyHint names an era that may be
+        // LOCKED here — remembered OUTSIDE the try (the catch handler
+        // must see it) so a NotACarrier from the resolver can be
+        // upgraded to the honest NeedsContactUnlock (unlock card +
+        // retry), instead of a misleading "no hidden message found".
+        var lockedKeyHint: ByteArray? = null
         try {
             val resolver: ((ByteArray, ByteArray) -> Pair<ByteArray, ByteArray>?)? =
                 if (passphrase == null) {
@@ -202,7 +211,11 @@ class StegoCipher(
                     // lookup is Room/DAO work — bridge it on THIS IO
                     // dispatcher, which is already where we run.
                     { keyHint, salt ->
-                        kotlinx.coroutines.runBlocking { resolveEraKeys(keyHint, salt) }
+                        kotlinx.coroutines.runBlocking {
+                            val keys = resolveEraKeys(keyHint, salt)
+                            if (keys == null) lockedKeyHint = keyHint
+                            keys
+                        }
                     }
                 } else {
                     null
@@ -215,6 +228,23 @@ class StegoCipher(
             )
             return@withContext StegoExtractOutcome.Extracted(message)
         } catch (e: StegoError.NotACarrier) {
+            // v1.6.0-beta.8: the trailer DID name an era — it just is not
+            // unlocked on this device (resolveEraKeys returned null).
+            // Surface the unlock card with the contact the trailer named
+            // instead of falling through to the pixel paths' generic
+            // "no hidden message found".
+            val hint = lockedKeyHint
+            if (passphrase == null && hint != null) {
+                val era = sessionKeys.eraByKeyId(hint)
+                if (era != null) {
+                    val name = contacts.contact(era.contactId)?.displayName
+                        ?: era.contactId.value
+                    return@withContext StegoExtractOutcome.NeedsContactUnlock(
+                        era.contactId,
+                        name,
+                    )
+                }
+            }
             // No trailer — try the pixel/sample paths below.
         } catch (e: Exception) {
             return@withContext StegoExtractOutcome.Failed(e)

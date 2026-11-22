@@ -58,6 +58,57 @@ class ContactsViewModel @Inject constructor(
     private val _feedback = MutableStateFlow<UiNotice?>(null)
     val feedback = _feedback.asStateFlow()
 
+    /**
+     * v1.6.0-beta.8 (user report: "when a contact is created and it says
+     * 'contact created', then you leave the page and come back, it should
+     * be gone — and it must not stick to the contact"): the CREATED notice
+     * is one-shot. It is posted when the contact is actually created and
+     * auto-dismisses after 4s; if the user leaves the Contacts tab before
+     * that, the banner is dropped on the NEXT re-entry instead of living
+     * in the ViewModel's state forever (the notice used to persist for as
+     * long as the ViewModel survived — "stuck to the contact").
+     *
+     * [consumingFeedback] pulls the notice ONCE: the first collection
+     * after a re-entry gets it, every later one sees null — so the banner
+     * can never reappear on a later visit.
+     */
+    private val _ephemeralFeedback = MutableStateFlow<UiNotice?>(null)
+    val ephemeralFeedback: kotlinx.coroutines.flow.StateFlow<UiNotice?> = _ephemeralFeedback.asStateFlow()
+
+    /** The auto-dismiss job for the one-shot banner. */
+    private var feedbackDismiss: kotlinx.coroutines.Job? = null
+
+    /**
+     * v1.6.0-beta.8: posts a ONE-SHOT success banner (create/delete):
+     * shown to the first collector that arrives, auto-cleared after 4s.
+     */
+    private fun postEphemeralFeedback(notice: UiNotice) {
+        feedbackDismiss?.cancel()
+        // A fresh banner starts UNSEEN — the next entry into the tab
+        // either displays it (the 4s timer still running) or drops it.
+        pendingSeen.set(false)
+        _ephemeralFeedback.value = notice
+        feedbackDismiss = viewModelScope.launch {
+            kotlinx.coroutines.delay(4_000)
+            _ephemeralFeedback.value = null
+        }
+    }
+
+    /** v1.6.0-beta.8: guards the one-shot consume against double drops. */
+    private val pendingSeen = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * v1.6.0-beta.8: called on every re-entry into the Contacts tab —
+     * consumes a one-shot banner that is still up (the user left before
+     * the 4s timer) so a returning user never sees a stale "created"
+     * line. A banner already displayed stays until its own timer.
+     */
+    fun consumeEphemeralFeedback() {
+        if (pendingSeen.compareAndSet(false, true)) {
+            _ephemeralFeedback.value = null
+        }
+    }
+
     private val _fingerprints = MutableStateFlow<Map<ContactId, String>>(emptyMap())
     val fingerprints = _fingerprints.asStateFlow()
 
@@ -165,7 +216,11 @@ class ContactsViewModel @Inject constructor(
                 // the new contact until the async loadEras query landed.
                 _eras.update { it + (contact.id to listOf(era)) }
                 loadEras(contact.id, notify = false)
-                _feedback.value = UiNotice(R.string.contact_feedback_created, null)
+                // v1.6.0-beta.8: one-shot banner — gone after 4s, never
+                // again after a re-entry (the sticky _feedback line used
+                // to greet the user on every return).
+                postEphemeralFeedback(UiNotice(R.string.contact_feedback_created, null))
+                _feedback.value = null
                 onResult(true, null)
             } catch (e: Ck1FormatException) {
                 val notice = UiNotice(R.string.contact_invalid_invite, e.message ?: "")
@@ -386,12 +441,10 @@ class ContactsViewModel @Inject constructor(
             // Deep-scan finding 15: the fingerprint cache belonged to the
             // unlocked session that no longer exists.
             _fingerprints.update { it - contactId }
-            _feedback.value = UiNotice(R.string.contact_feedback_deleted, null)
+            // v1.6.0-beta.8: the deleted banner is one-shot too.
+            postEphemeralFeedback(UiNotice(R.string.contact_feedback_deleted, null))
+            _feedback.value = null
         }
-    }
-
-    fun clearFeedback() {
-        _feedback.value = null
     }
 
     private suspend fun refreshUnlocked() {

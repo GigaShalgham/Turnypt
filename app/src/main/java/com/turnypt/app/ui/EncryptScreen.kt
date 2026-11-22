@@ -134,6 +134,14 @@ fun EncryptScreen(
                     onValueChange = { input = it },
                     placeholder = { Text(stringResource(R.string.tools_input_hint)) },
                     minLines = 3,
+                    // v1.6.0-beta.8 (user decree): every text input gets a
+                    // Done key — tapping it closes the keyboard.
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onDone = { },
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

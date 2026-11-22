@@ -81,13 +81,23 @@ fun ContactsScreen(viewModel: ContactsViewModel, biometrics: BiometricKeyStore) 
     val contacts by viewModel.contacts.collectAsStateWithLifecycle()
     val unlocked by viewModel.unlocked.collectAsStateWithLifecycle()
     val eras by viewModel.eras.collectAsStateWithLifecycle()
-    val feedback by viewModel.feedback.collectAsStateWithLifecycle()
+    val feedback by viewModel.ephemeralFeedback.collectAsStateWithLifecycle()
     val fingerprints by viewModel.fingerprints.collectAsStateWithLifecycle()
     val biometricOffered by viewModel.biometricOffered.collectAsStateWithLifecycle()
     val biometricPrompt by viewModel.biometricPrompt.collectAsStateWithLifecycle()
     val dialogNotice by viewModel.dialogNotice.collectAsStateWithLifecycle()
 
     androidx.compose.runtime.LaunchedEffect(contacts) { viewModel.refreshAll() }
+
+    // v1.6.0-beta.8 (user report: "after creating a contact and leaving
+    // the page, on return the 'contact created' banner should be gone"):
+    // entering the screen CONSUMES the one-shot banner — whatever the
+    // 4s timer has not yet dismissed is dropped here, so a fresh visit
+    // never starts with a stale success line, and the banner never
+    // reappears once it has shown.
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.consumeEphemeralFeedback()
+    }
 
     // v0.4.1: the system fingerprint prompt lives at screen level (it needs
     // the FragmentActivity); the dialogs only request it.
@@ -314,6 +324,12 @@ private fun AddContactDialog(
                     onValueChange = { name = it },
                     label = { Text(stringResource(R.string.contact_name_label)) },
                     singleLine = true,
+                    // v1.6.0-beta.8 (user decree): every text input gets an
+                    // IME confirm key. Name -> Next jumps to the invite
+                    // field; the invite field's own key is Done.
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                    ),
                 )
                 OutlinedTextField(
                     value = invite,
@@ -324,6 +340,14 @@ private fun AddContactDialog(
                     label = { Text(stringResource(R.string.contact_invite_label)) },
                     singleLine = true,
                     isError = failed,
+                    // v1.6.0-beta.8: the last field of the form — Done
+                    // closes the keyboard.
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onDone = { },
+                    ),
                 )
                 Text(
                     stringResource(R.string.contact_invite_help),
@@ -482,7 +506,15 @@ private fun ContactDetailDialog(
                         label = { Text(stringResource(R.string.passphrase_label)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            // v1.6.0-beta.8 (user decree): Done closes the
+                            // keyboard on every text input.
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                        ),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onDone = { },
+                        ),
                     )
                     if (suggestPassphrase) {
                         // v0.5.2: strong-passphrase suggestion AT the entry

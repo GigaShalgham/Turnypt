@@ -265,8 +265,13 @@ fun TurnyptApp() {
             }
 
             // v1.6.0-beta.6: the stego screen on the restored glass base.
+            // v1.6.0-beta.8: biometrics flow in — the screen now hosts the
+            // fingerprint prompt + button the other tabs show.
             composable(DestinationRoute.STEGO) {
-                StegoScreen(viewModel = hiltViewModel<ToolsViewModel>())
+                StegoScreen(
+                    viewModel = hiltViewModel<ToolsViewModel>(),
+                    biometrics = LocalBiometrics.current,
+                )
             }
             composable(DestinationRoute.SETTINGS) {
                 SettingsScreen(

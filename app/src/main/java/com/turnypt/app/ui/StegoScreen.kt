@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -27,11 +29,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.turnypt.app.R
+import com.turnypt.app.StegoEmbedDone
 import com.turnypt.app.ToolsViewModel
 import com.turnypt.app.companion.ImageFiles
+import com.turnypt.app.security.BiometricKeyStore
+import com.turnypt.app.security.BiometricPromptHost
+import com.turnypt.app.security.rememberBiometricPromptHelper
 
 /**
  * Stego screen (stego plan §6.1 / S4), in the app's own v1.5.10 design
@@ -42,38 +49,53 @@ import com.turnypt.app.companion.ImageFiles
  * for failures, and an EncryptedFileCard-shaped result card with
  * Share-as-document / Clear.
  *
- * v1.6.0-beta.7 (the 2026-11-22 user decree, two parts):
+ * v1.6.0-beta.8 (the 2026-11-22 user decree, four parts):
  *
- *  1. NO FILE-TYPE RESTRICTION. The SAF picker launches with NO MIME
- *     filter — every file, every extension, grey nothing. The ANY
- *     carrier (EOF-append) rides everything: PNG/WAV keep their
- *     pixel-sample paths, every other file gets the sealed CKE1 trailer
- *     after its untouched bytes.
- *  2. A MEMBER OF THE TURNYPT ECOSYSTEM. The new second segment
- *     (Contact key | Own passphrase) routes the SAME contact picker,
- *     the SAME unlock card and the SAME era/timeout discipline the
- *     Encrypt tab uses: hide-for-contact seals for the contact's era,
- *     reveal resolves the contact from the trailer and unlocks through
- *     the standard card. The passphrase-only model (plan §4.4) stays
- *     as the second choice.
+ *  1. OWN PASSPHRasse REMOVED. "Remove my own passphrase — contacts
+ *     only": the Contact key | Own passphrase segment pair is GONE.
+ *     Every seal rides a contact's era (hide) and every reveal resolves
+ *     the contact from the carrier's trailer (reveal) — the ONLY key
+ *     model on this screen now.
+ *  2. SEPARATE CARRIERS. "Why is the carrier file shared between hide
+ *     and reveal": it no longer is. The Hide half has its own carrier
+ *     pick and the Reveal half has its own; toggling the segment never
+ *     carries one file into the other half.
+ *  3. SHARE SENDS THE REAL FILE. The result card's Share button now
+ *     goes through the app FileProvider (a content uri with the
+ *     carrier's own MIME - audio for a song, image for a picture)
+ *     so Telegram/WhatsApp receive a real FILE, not a stream
+ *     attachment that some apps silently re-encode or refuse.
+ *  4. FINGERPRINT ON THIS SCREEN. The biometric prompt host and the
+ *     "Use fingerprint" button the Encrypt/Decrypt tabs show live
+ *     here too (the user report: "that page has no fingerprint
+ *     button").
+ *
+ * v1.6.0-beta.7 lineage (kept): NO FILE-TYPE RESTRICTION — the SAF
+ * picker launches with NO MIME filter; the ANY carrier (EOF-append)
+ * rides everything, PNG/WAV keep their pixel-sample paths.
  */
 @Composable
-fun StegoScreen(viewModel: ToolsViewModel) {
+fun StegoScreen(viewModel: ToolsViewModel, biometrics: BiometricKeyStore) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var message by rememberSaveable { mutableStateOf("") }
-    // The pending stego passphrase — held only for the interaction that typed
-    // it (deliberately NOT saveable: view-state never outlives the field),
-    // because PassphraseInput clears itself on submit.
-    var pendingStegoPassphrase by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf<CharArray?>(null)
-    }
 
     LaunchedEffect(Unit) { viewModel.refresh() }
 
-    // SAF: pick the carrier — NO MIME FILTER (the beta.7 decree: every
-    // file, every extension; the ANY carrier handles them all).
-    val pickCarrier = rememberLauncherForActivityResult(
+    // v1.6.0-beta.8: the fingerprint prompt host — the SAME machinery
+    // the Encrypt/Decrypt tabs use, now on the stego screen too.
+    val promptHelper = rememberBiometricPromptHelper(biometrics)
+    BiometricPromptHost(
+        helper = promptHelper,
+        request = state.biometricPrompt,
+        loadRememberKey = viewModel::consumeRememberKey,
+        onUnlock = viewModel::onBiometricUnlockResult,
+        onRememberDone = viewModel::onRememberDone,
+    )
+
+    // SAF: the HIDE side's carrier — NO MIME FILTER (the beta.7 decree:
+    // every file, every extension; the ANY carrier handles them all).
+    val pickHideCarrier = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
@@ -82,6 +104,23 @@ fun StegoScreen(viewModel: ToolsViewModel) {
                 ImageFiles.queryDisplayName(context, uri),
                 ImageFiles.querySize(context, uri),
                 ImageFiles.queryMimeType(context, uri),
+                forReveal = false,
+            )
+        }
+    }
+
+    // SAF: the REVEAL side's own carrier — its OWN picker, its OWN slot
+    // (the beta.8 decree: never shared with the Hide half).
+    val pickRevealCarrier = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.pickStegoCarrier(
+                uri,
+                ImageFiles.queryDisplayName(context, uri),
+                ImageFiles.querySize(context, uri),
+                ImageFiles.queryMimeType(context, uri),
+                forReveal = true,
             )
         }
     }
@@ -91,8 +130,7 @@ fun StegoScreen(viewModel: ToolsViewModel) {
         ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri ->
         if (uri != null) {
-            viewModel.embedStegoTo(uri, message, pendingStegoPassphrase ?: CharArray(0))
-            pendingStegoPassphrase = null
+            viewModel.embedStegoTo(uri, message, CharArray(0))
         }
     }
 
@@ -121,38 +159,38 @@ fun StegoScreen(viewModel: ToolsViewModel) {
 
         BusyLine(visible = state.stegoBusy)
 
-        // ── The carrier — every file, every extension ──────────────
-        SectionCard(
-            title = stringResource(R.string.stego_step_carrier),
-            icon = TurnyptIcons.Image,
-        ) {
-            Text(
-                stringResource(R.string.stego_carrier_hint_live),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            val carrier = state.stegoCarrier
-            if (carrier != null) {
-                PickedImageCard(
-                    displayName = carrier.displayName,
-                    sizeBytes = carrier.sizeBytes,
-                    busy = state.stegoBusy,
-                    onReplace = {
-                        pickCarrier.launch(arrayOf("*/*"))
-                    },
-                )
-            } else {
-                Button(
-                    onClick = {
-                        pickCarrier.launch(arrayOf("*/*"))
-                    },
-                    enabled = !state.stegoBusy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.stego_pick_carrier)) }
-            }
-        }
-
         if (!state.stegoExtractMode) {
+            // ── The HIDE carrier — its own pick, every file ──────────
+            SectionCard(
+                title = stringResource(R.string.stego_step_carrier),
+                icon = TurnyptIcons.Image,
+            ) {
+                Text(
+                    stringResource(R.string.stego_carrier_hint_live),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val carrier = state.stegoHideCarrier
+                if (carrier != null) {
+                    PickedImageCard(
+                        displayName = carrier.displayName,
+                        sizeBytes = carrier.sizeBytes,
+                        busy = state.stegoBusy,
+                        onReplace = {
+                            pickHideCarrier.launch(arrayOf("*/*"))
+                        },
+                    )
+                } else {
+                    Button(
+                        onClick = {
+                            pickHideCarrier.launch(arrayOf("*/*"))
+                        },
+                        enabled = !state.stegoBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.stego_pick_carrier)) }
+                }
+            }
+
             // ── The hidden message — the input section's shape ────────
             SectionCard(
                 title = stringResource(R.string.stego_step_message),
@@ -163,91 +201,71 @@ fun StegoScreen(viewModel: ToolsViewModel) {
                     onValueChange = { message = it },
                     placeholder = { Text(stringResource(R.string.stego_message_label)) },
                     minLines = 3,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { }),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
 
-            // ── The key model — Contact key | Own passphrase ────────
+            // ── The contact — the ONLY key model (beta.8 decree) ────
             SectionCard(
                 title = stringResource(R.string.stego_key_model_title),
                 icon = TurnyptIcons.People,
             ) {
-                DualSegmentRow(
-                    firstSelected = state.stegoEcosystemMode,
-                    firstLabel = stringResource(R.string.stego_key_contact),
-                    firstIcon = TurnyptIcons.People,
-                    onFirstSelected = { viewModel.setStegoEcosystemMode(true) },
-                    secondLabel = stringResource(R.string.stego_key_passphrase),
-                    secondIcon = TurnyptIcons.Lock,
-                    onSecondSelected = { viewModel.setStegoEcosystemMode(false) },
+                // The SAME contact picker the Encrypt tab uses — the
+                // hidden message rides the contact's era (unlock,
+                // timeout, rotation discipline all included).
+                ContactPicker(
+                    contacts = state.contacts,
+                    selectedContactId = state.selectedContactId,
+                    unlocked = state.unlocked,
+                    onContactSelected = viewModel::selectContact,
                 )
-                if (state.stegoEcosystemMode) {
-                    // The SAME contact picker the Encrypt tab uses — the
-                    // hidden message rides the contact's era (unlock,
-                    // timeout, rotation discipline all included).
-                    ContactPicker(
-                        contacts = state.contacts,
-                        selectedContactId = state.selectedContactId,
-                        unlocked = state.unlocked,
-                        onContactSelected = viewModel::selectContact,
-                    )
-                    val contact = state.selectedContact
-                    if (contact != null && state.selectedContactId !in state.unlocked) {
-                        // The SAME unlock card the Encrypt tab shows —
-                        // the ecosystem route needs the era unlocked
-                        // BEFORE the hide action runs.
-                        Text(
-                            stringResource(R.string.stego_locked_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        PassphraseInput(
-                            label = stringResource(R.string.passphrase_label),
-                            buttonLabel = stringResource(R.string.unlock_encrypt_action),
-                            busy = state.busy,
-                            onSubmit = viewModel::unlockAndContinue,
-                        )
-                    } else {
-                        Text(
-                            stringResource(R.string.stego_ecosystem_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Button(
-                            onClick = {
-                                state.stegoCarrier?.let { carrier ->
-                                    createStego.launch(
-                                        carrier.displayName.ifBlank { "carrier" },
-                                    )
-                                }
-                            },
-                            enabled = !state.stegoBusy &&
-                                state.stegoCarrier != null &&
-                                contact != null &&
-                                state.selectedContactId in state.unlocked,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.stego_embed_action)) }
-                    }
-                } else {
-                    // ── The passphrase-only model (plan §4.4) ────────
+                val contact = state.selectedContact
+                if (contact != null && state.selectedContactId !in state.unlocked) {
+                    // The SAME unlock card the Encrypt tab shows —
+                    // the ecosystem route needs the era unlocked
+                    // BEFORE the hide action runs.
                     Text(
-                        stringResource(R.string.stego_passphrase_hint),
+                        stringResource(R.string.stego_locked_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     PassphraseInput(
-                        label = stringResource(R.string.stego_passphrase_label),
-                        buttonLabel = stringResource(R.string.stego_embed_action),
-                        busy = state.stegoBusy,
-                        onSubmit = { passphrase ->
-                            pendingStegoPassphrase = passphrase
-                            state.stegoCarrier?.let { carrier ->
+                        label = stringResource(R.string.passphrase_label),
+                        buttonLabel = stringResource(R.string.unlock_encrypt_action),
+                        busy = state.busy,
+                        onSubmit = viewModel::unlockAndContinue,
+                    )
+                    // v1.6.0-beta.8: the fingerprint shortcut the other
+                    // tabs show — right on the locked contact card.
+                    if (state.biometricOffered) {
+                        OutlinedButton(
+                            onClick = viewModel::requestBiometricUnlock,
+                            enabled = !state.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.use_fingerprint)) }
+                    }
+                } else {
+                    Text(
+                        stringResource(R.string.stego_ecosystem_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(
+                        onClick = {
+                            state.stegoHideCarrier?.let { carrier ->
                                 createStego.launch(
-                                    carrier.displayName.ifBlank { "carrier.png" },
+                                    carrier.displayName.ifBlank { "carrier" },
                                 )
                             }
                         },
-                    )
+                        enabled = !state.stegoBusy &&
+                            state.stegoHideCarrier != null &&
+                            contact != null &&
+                            state.selectedContactId in state.unlocked,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.stego_embed_action)) }
                 }
             }
 
@@ -274,11 +292,20 @@ fun StegoScreen(viewModel: ToolsViewModel) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(
                             onClick = {
-                                ImageShare.uri(
+                                // v1.6.0-beta.8 (user report: "the share
+                                // button does not send it as a file, e.g.
+                                // the song"): the share now goes through
+                                // the app's FileProvider with the
+                                // CARRIER'S OWN MIME — audio/* for a
+                                // song, image/* for a picture — so the
+                                // receiver's app treats it as a real
+                                // file (a document send with the right
+                                // type), not an anonymous octet-stream
+                                // blob.
+                                StegoShare.shareResult(
                                     context,
-                                    Uri.parse(result.outputUriString),
-                                    "application/octet-stream",
-                                    context.getString(R.string.stego_preview_share),
+                                    result,
+                                    state.stegoHideCarrier?.mime,
                                 )
                             },
                             modifier = Modifier.weight(1f),
@@ -286,7 +313,7 @@ fun StegoScreen(viewModel: ToolsViewModel) {
                             Text(stringResource(R.string.stego_preview_share))
                         }
                         OutlinedButton(
-                            onClick = viewModel::clearStegoCarrier,
+                            onClick = { viewModel.clearStegoCarrier() },
                             modifier = Modifier.weight(1f),
                         ) {
                             Text(stringResource(R.string.action_clear))
@@ -295,61 +322,76 @@ fun StegoScreen(viewModel: ToolsViewModel) {
                 }
             }
         } else {
-            // ── Reveal — the ecosystem first, the passphrase second ──
+            // ── The REVEAL carrier — its OWN pick, never the hide one ──
+            SectionCard(
+                title = stringResource(R.string.stego_step_carrier),
+                icon = TurnyptIcons.Image,
+            ) {
+                Text(
+                    stringResource(R.string.stego_reveal_carrier_hint_live),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val carrier = state.stegoRevealCarrier
+                if (carrier != null) {
+                    PickedImageCard(
+                        displayName = carrier.displayName,
+                        sizeBytes = carrier.sizeBytes,
+                        busy = state.stegoBusy,
+                        onReplace = {
+                            pickRevealCarrier.launch(arrayOf("*/*"))
+                        },
+                    )
+                } else {
+                    Button(
+                        onClick = {
+                            pickRevealCarrier.launch(arrayOf("*/*"))
+                        },
+                        enabled = !state.stegoBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.stego_pick_reveal_carrier)) }
+                }
+            }
+
+            // ── Reveal — the file names the contact itself ────────────
             SectionCard(
                 title = stringResource(R.string.stego_key_model_title),
                 icon = TurnyptIcons.People,
             ) {
-                DualSegmentRow(
-                    firstSelected = state.stegoEcosystemMode,
-                    firstLabel = stringResource(R.string.stego_key_contact),
-                    firstIcon = TurnyptIcons.People,
-                    onFirstSelected = { viewModel.setStegoEcosystemMode(true) },
-                    secondLabel = stringResource(R.string.stego_key_passphrase),
-                    secondIcon = TurnyptIcons.Lock,
-                    onSecondSelected = { viewModel.setStegoEcosystemMode(false) },
+                // The trailer NAMES the contact (its era keyHint);
+                // unlock rides the SAME card the Decrypt tab shows for
+                // locked eras, and the extract retries automatically
+                // after a successful unlock.
+                Text(
+                    stringResource(R.string.stego_reveal_ecosystem_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (state.stegoEcosystemMode) {
-                    // Reveal for a contact: the trailer NAMES the contact
-                    // (its era keyHint); unlock rides the SAME card the
-                    // Decrypt tab shows for locked eras, and the extract
-                    // retries automatically after a successful unlock.
-                    Text(
-                        stringResource(R.string.stego_reveal_ecosystem_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(
-                        onClick = {
-                            viewModel.extractStegoFrom(CharArray(0))
-                        },
-                        enabled = !state.stegoBusy && state.stegoCarrier != null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(stringResource(R.string.stego_reveal_action)) }
-                    if (state.unlockNeeded && state.unlockContactName != null) {
-                        // The SAME unlock card shape — the contact the
-                        // trailer named is locked on this device.
-                        PassphraseInput(
-                            label = stringResource(R.string.passphrase_label),
-                            buttonLabel = stringResource(R.string.unlock_encrypt_action),
-                            busy = state.busy,
-                            onSubmit = viewModel::unlockAndContinue,
-                        )
-                    }
-                } else {
-                    Text(
-                        stringResource(R.string.stego_passphrase_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Button(
+                    onClick = {
+                        viewModel.extractStegoFrom(CharArray(0))
+                    },
+                    enabled = !state.stegoBusy && state.stegoRevealCarrier != null,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.stego_reveal_action)) }
+                if (state.unlockNeeded && state.unlockContactName != null) {
+                    // The SAME unlock card shape — the contact the
+                    // trailer named is locked on this device.
                     PassphraseInput(
-                        label = stringResource(R.string.stego_passphrase_label),
-                        buttonLabel = stringResource(R.string.stego_reveal_action),
-                        busy = state.stegoBusy,
-                        onSubmit = { passphrase ->
-                            viewModel.extractStegoFrom(passphrase)
-                        },
+                        label = stringResource(R.string.passphrase_label),
+                        buttonLabel = stringResource(R.string.unlock_encrypt_action),
+                        busy = state.busy,
+                        onSubmit = viewModel::unlockAndContinue,
                     )
+                    // v1.6.0-beta.8: the fingerprint shortcut on the
+                    // reveal-side unlock card too.
+                    if (state.biometricOffered) {
+                        OutlinedButton(
+                            onClick = viewModel::requestBiometricUnlock,
+                            enabled = !state.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.use_fingerprint)) }
+                    }
                 }
             }
 
@@ -364,7 +406,7 @@ fun StegoScreen(viewModel: ToolsViewModel) {
                         monospace = false,
                         copied = state.copied,
                         onCopy = viewModel::copyResult,
-                        onClear = viewModel::clearStegoCarrier,
+                        onClear = { viewModel.clearStegoCarrier(forReveal = true) },
                     )
                 }
             }
@@ -379,3 +421,102 @@ fun StegoScreen(viewModel: ToolsViewModel) {
         Spacer(modifier = Modifier.height(96.dp))
     }
 }
+
+/**
+ * v1.6.0-beta.8 (user report: "the share button you put there does not
+ * send it as a file, e.g. the song"): the stego result's share path.
+ *
+ * The old path handed the raw SAF uri with a hardcoded
+ * `application/octet-stream` — many apps (Telegram included) treat that
+ * as an anonymous blob: no file name, no type, sometimes silently
+ * re-encoded. The fix goes through the app's OWN FileProvider:
+ *
+ *  1. the SAF output is copied into the app's private cache (a real
+ *     file with the carrier's real name — song.mp3 stays song.mp3);
+ *  2. the file is shared as a content uri with the carrier's OWN
+ *     advertised MIME (audio for a song, image for a picture,
+ *     video for a clip) — the receiver sees a genuine FILE of the
+ *     type it already knows how to receive;
+ *  3. the cache copy is marked delete-on-share (FLAG_GRANT_READ is
+ *     enough for the receiver; the file wipes on the next embed or on
+ *     app exit — the cache dir is the app's own).
+ */
+object StegoShare {
+
+    /** The cap on one cache copy (matches the stego carrier ceiling). */
+    private const val MAX_CACHE_BYTES = 256L * 1024L * 1024L
+
+    /**
+     * Copies [result]'s SAF output into the app cache and shares it as a
+     * real file with the carrier's [carrierMime] (fallback: the honest
+     * generic document type). Falls back to a direct SAF grant share
+     * (still as a file) when the copy fails — never to a text/blob send.
+     */
+    fun shareResult(
+        context: android.content.Context,
+        result: StegoEmbedDone,
+        carrierMime: String?,
+    ) {
+        val uri = android.net.Uri.parse(result.outputUriString)
+        val cache = runCatching { copyToCache(context, uri, result.displayName) }
+            .getOrNull()
+        val fileUri = cache?.let { file ->
+            runCatching {
+                androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                )
+            }.getOrNull()
+        }
+        if (fileUri != null) {
+            ImageShare.uri(context, fileUri, resolveMime(carrierMime, cache), null)
+            return
+        }
+        // Copy failed (huge file / stream hiccup): grant-share the SAF
+        // uri directly, still typed as a file — never a blob.
+        ImageShare.uri(
+            context,
+            uri,
+            resolveMime(carrierMime, null),
+            context.getString(R.string.stego_preview_share),
+        )
+    }
+
+    /**
+     * The MIME the share carries: the carrier's advertised type when the
+     * system knows one, else the honest application/octet-stream (the
+     * file IS bytes; the name carries what it is).
+     */
+    private fun resolveMime(carrierMime: String?, cache: java.io.File?): String {
+        if (!carrierMime.isNullOrBlank() && carrierMime != "*/*") return carrierMime
+        return runCatching {
+            cache?.let { android.webkit.MimeTypeMap.getFileExtensionFromUrl(it.name) }
+                ?.let { ext ->
+                    android.webkit.MimeTypeMap.getSingleton()
+                        .getMimeTypeFromExtension(ext.lowercase())
+                }
+        }.getOrNull() ?: "application/octet-stream"
+    }
+
+    /**
+     * Copies the SAF output into a fresh cache file named after the
+     * carrier (bounded by [MAX_CACHE_BYTES]; a larger file stays on the
+     * direct-grant path — the messenger streams it from SAF).
+     */
+    private fun copyToCache(
+        context: android.content.Context,
+        uri: android.net.Uri,
+        displayName: String,
+    ): java.io.File? {
+        val safe = displayName.substringAfterLast('/').takeIf { it.isNotBlank() } ?: "carrier"
+        val target = java.io.File(context.cacheDir, "stego_share_${System.currentTimeMillis()}_$safe")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            val size = input.available()
+            if (size > MAX_CACHE_BYTES) return null
+            target.outputStream().use { output -> input.copyTo(output) }
+        } ?: return null
+        return target
+    }
+}
+
