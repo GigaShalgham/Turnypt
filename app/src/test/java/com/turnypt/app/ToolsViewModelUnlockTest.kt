@@ -410,6 +410,17 @@ class ToolsViewModelUnlockTest {
                 biometricStore = biometrics,
                 algorithmSource = algorithmSource,
                 streams = FakeStreams(),
+                stegoCipher = com.turnypt.data.repository.StegoCipher(
+                    random = com.turnypt.core.crypto.ProtocolRandom(
+                        com.turnypt.core.crypto.RandomSource.SECURE,
+                    ),
+                    dispatchers = com.turnypt.core.common.DispatcherProvider(
+                        io = kotlinx.coroutines.Dispatchers.Unconfined,
+                        default = kotlinx.coroutines.Dispatchers.Unconfined,
+                        main = kotlinx.coroutines.Dispatchers.Unconfined,
+                    ),
+                    kdfParams = FAST_PARAMS,
+                ),
             )
             viewModel = vm
             return vm

@@ -369,7 +369,7 @@
          of the Phase 1 embed flow with no system behind them yet. -->
     <string name="home_quick_stego">Hide in file</string>
     <string name="stego_title">Hide in file</string>
-    <string name="stego_subtitle">Disguise a message inside a carrier file — the frame for the upcoming stego feature.</string>
+    <string name="stego_subtitle">Hide a message inside a PNG or WAV file — or reveal one.</string>
     <string name="stego_step_carrier">1 · Carrier file</string>
     <string name="stego_carrier_hint">Pick the innocent-looking file that will carry the hidden message. PNG, JPEG, WAV or MP4.</string>
     <string name="stego_pick_carrier">Choose carrier file</string>
@@ -377,10 +377,35 @@
     <string name="stego_step_message">2 · Hidden message</string>
     <string name="stego_message_label">Message to hide</string>
     <string name="stego_embed_action">Hide message in file</string>
-    <string name="stego_coming_soon">Design preview — embedding is not wired yet.</string>
     <string name="stego_preview_title">Preview</string>
     <string name="stego_preview_ready">%1$s carrier ready</string>
     <string name="stego_preview_explainer">Send the result as a file (document), never as a photo, audio or video — messengers re-encode media and would destroy the hidden message.</string>
-    <string name="stego_preview_share">Share</string>
+    <string name="stego_preview_share">Share as document</string>
     <string name="stego_preview_reset">Close preview</string>
+    <string name="stego_subtitle_live">Hide a message inside a carrier file — or reveal one hidden for you.</string>
+    <string name="stego_mode_hide">Hide a message</string>
+    <string name="stego_mode_reveal">Reveal a message</string>
+    <string name="stego_carrier_hint_live">Pick a PNG image or a WAV audio file as the carrier. The file stays playable and viewable; the message rides inside.</string>
+    <string name="stego_carrier_clear">Change</string>
+    <string name="stego_passphrase_title">Passphrase</string>
+    <string name="stego_passphrase_label">Stego passphrase</string>
+    <string name="stego_passphrase_hint">The passphrase is the only key (no contact or key era is used). Share it through a different channel — for example in person or via the encrypted text flow.</string>
+    <string name="stego_reveal_action">Reveal message</string>
+    <string name="stego_revealed_title">Hidden message</string>
+    <string name="stego_err_open_failed">Could not open the picked file.</string>
+    <string name="stego_err_write_failed">Could not write the output file.</string>
+    <string name="stego_err_too_small">This %1$s file is too small for the message. Pick a larger carrier or shorten the message.</string>
+    <string name="stego_err_not_carrier">No hidden message found — either this file carries none, or the passphrase is wrong.</string>
+    <string name="stego_err_failed">The stego operation failed.</string>
+    <string name="stego_tier_title">How to send it safely</string>
+    <string name="stego_tier_direct">Safest: direct transfer — USB, cloud drive, or any file copy. Bytes arrive exactly as they left.</string>
+    <string name="stego_tier_document">Good: send as a DOCUMENT (file attachment). Telegram and WhatsApp keep document files byte-exact.</string>
+    <string name="stego_tier_never">Never: send as a photo, audio or video message — messengers re-encode media and destroy the hidden bits.</string>
+    <string name="settings_stego_matrix_title">Carrier capability matrix</string>
+    <string name="settings_stego_matrix_intro">Which files can carry a hidden message, and how safely they travel.</string>
+    <string name="settings_stego_matrix_png">PNG image — supported carrier. Lossless: survives any byte-exact transfer; re-encoding as photo destroys it.</string>
+    <string name="settings_stego_matrix_wav">WAV audio — supported carrier. Lossless PCM; survives byte-exact transfer as a file.</string>
+    <string name="settings_stego_matrix_jpeg">JPEG image — not supported as carrier (lossy re-encode destroys LSB data). PNG is the image carrier.</string>
+    <string name="settings_stego_matrix_mp4">MP4 video — not enabled in this build; pending the tail-append proof matrix (plan S0 gate).</string>
+    <string name="settings_stego_matrix_lossy">Lossy media (JPEG, MP3, AAC, re-encoded video) can never carry hidden bits — only byte-exact files do.</string>
 </resources>

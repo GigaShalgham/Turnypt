@@ -205,4 +205,16 @@ object RepositoryModule {
         algorithmSource = algorithmSource,
         dispatchers = dispatchers,
     )
+
+    /** v1.6.0: the stego facade — passphrase-only key model (plan §4.4). */
+    @Provides
+    @Singleton
+    fun provideStegoCipher(
+        random: ProtocolRandom,
+        dispatchers: DispatcherProvider,
+    ): StegoCipher = StegoCipher(
+        random = random,
+        dispatchers = dispatchers,
+        kdfParams = StegoCipherDefaults.KDF_PARAMS,
+    )
 }

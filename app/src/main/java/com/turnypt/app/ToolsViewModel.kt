@@ -148,6 +148,20 @@ data class ToolsUiState(
     val customFileSuffix: String? = null,
     /** What that preference resolves to on THIS device (chip label). */
     val resolvedCipherName: String? = null,
+
+    // ------------------------------------------------------ v1.6.0 stego
+    /** The carrier picked for stego embed/extract (SAF). */
+    val stegoCarrier: StegoCarrierSource? = null,
+    /** True while a stego embed/extract runs. */
+    val stegoBusy: Boolean = false,
+    /** A finished embed: output URI + kind (the share-ready card). */
+    val stegoResult: StegoEmbedDone? = null,
+    /** A finished extract: the recovered message text. */
+    val stegoExtracted: String? = null,
+    /** The extract-mode toggle on the stego screen. */
+    val stegoExtractMode: Boolean = false,
+    /** Extract-side failure detail (wrong passphrase / not a carrier). */
+    val stegoNotice: com.turnypt.app.companion.UiNotice? = null,
 ) {
     val selectedContact: Contact?
         get() = contacts.firstOrNull { it.id == selectedContactId }
@@ -174,6 +188,7 @@ class ToolsViewModel @Inject constructor(
     private val biometricStore: BiometricKeyStore,
     private val algorithmSource: CipherAlgorithmSource,
     private val streams: ContentResolverStreams,
+    private val stegoCipher: com.turnypt.data.repository.StegoCipher,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ToolsUiState())
@@ -1234,6 +1249,169 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+
+    // ------------------------------------------------- v1.6.0 stego ops
+    /** The carrier the user picked (SAF OpenDocument). */
+    fun pickStegoCarrier(uri: Uri, displayName: String?, sizeBytes: Long?, mime: String?) {
+        _state.value = _state.value.copy(
+            stegoCarrier = StegoCarrierSource(
+                uriString = uri.toString(),
+                displayName = displayName?.takeIf { it.isNotBlank() } ?: "carrier",
+                sizeBytes = sizeBytes,
+                mime = mime,
+            ),
+            stegoResult = null,
+            stegoExtracted = null,
+            stegoNotice = null,
+        )
+    }
+
+    fun clearStegoCarrier() {
+        _state.value = _state.value.copy(
+            stegoCarrier = null,
+            stegoResult = null,
+            stegoExtracted = null,
+            stegoNotice = null,
+        )
+    }
+
+    fun setStegoExtractMode(extract: Boolean) {
+        _state.value = _state.value.copy(
+            stegoExtractMode = extract,
+            stegoResult = null,
+            stegoExtracted = null,
+            stegoNotice = null,
+        )
+    }
+
+    fun dismissStegoNotice() {
+        _state.value = _state.value.copy(stegoNotice = null)
+    }
+
+    /**
+     * Embeds the typed message into the picked carrier, writing the
+     * result to [outputUri]. Passphrase-only per plan §4.4 — the selected
+     * contact is UX sugar only; NO session key is consulted.
+     */
+    fun embedStegoTo(outputUri: Uri, message: String, passphrase: CharArray) {
+        val carrier = _state.value.stegoCarrier ?: return
+        launchSafely { embedStegoInternal(carrier, outputUri, message, passphrase) }
+    }
+
+    /**
+     * Extracts the hidden message from the picked carrier under the typed
+     * passphrase (plan §4.5: a wrong passphrase dies at the frame tag —
+     * the UI says "not a carrier", never "half right").
+     */
+    fun extractStegoFrom(passphrase: CharArray) {
+        val carrier = _state.value.stegoCarrier ?: return
+        launchSafely { extractStegoInternal(carrier, passphrase) }
+    }
+
+    private suspend fun embedStegoInternal(
+        carrier: StegoCarrierSource,
+        outputUri: Uri,
+        message: String,
+        passphrase: CharArray,
+    ) {
+        _state.value = _state.value.copy(stegoBusy = true, notice = null, stegoNotice = null)
+        val input = streams.read(Uri.parse(carrier.uriString))
+        if (input == null) {
+            _state.value = _state.value.copy(
+                stegoBusy = false,
+                stegoNotice = null,
+            )
+            return
+        }
+        val output = streams.write(outputUri)
+        if (output == null) {
+            runCatching { input.close() }
+            _state.value = _state.value.copy(
+                stegoBusy = false,
+                stegoNotice = null,
+            )
+            return
+        }
+        val outcome = try {
+            stegoCipher.embed(input, output, message.toByteArray(Charsets.UTF_8), passphrase)
+        } finally {
+            runCatching { input.close() }
+            runCatching { output.close() }
+        }
+        when (outcome) {
+            is com.turnypt.data.repository.StegoEmbedOutcome.Embedded -> {
+                _state.value = _state.value.copy(
+                    stegoBusy = false,
+                    stegoResult = StegoEmbedDone(
+                        outputUriString = outputUri.toString(),
+                        displayName = streams.queryDisplayName(outputUri)
+                            ?: carrier.displayName,
+                        carrierKind = outcome.carrierKind.label,
+                    ),
+                )
+            }
+            is com.turnypt.data.repository.StegoEmbedOutcome.CarrierTooSmall -> {
+                _state.value = _state.value.copy(
+                    stegoBusy = false,
+                    stegoNotice = stegoMsg(R.string.stego_err_too_small, outcome.carrierKind.label),
+                )
+            }
+            com.turnypt.data.repository.StegoEmbedOutcome.NotACarrier -> {
+                _state.value = _state.value.copy(
+                    stegoBusy = false,
+                    stegoNotice = stegoMsg(R.string.stego_err_not_carrier),
+                )
+            }
+            is com.turnypt.data.repository.StegoEmbedOutcome.Failed -> {
+                _state.value = _state.value.copy(
+                    stegoBusy = false,
+                    stegoNotice = stegoMsg(R.string.stego_err_failed),
+                )
+            }
+        }
+    }
+
+    private suspend fun extractStegoInternal(carrier: StegoCarrierSource, passphrase: CharArray) {
+        _state.value = _state.value.copy(stegoBusy = true, notice = null, stegoNotice = null)
+        val input = streams.read(Uri.parse(carrier.uriString))
+        if (input == null) {
+            _state.value = _state.value.copy(
+                stegoBusy = false,
+                stegoNotice = stegoMsg(R.string.stego_err_open_failed),
+            )
+            return
+        }
+        val outcome = try {
+            stegoCipher.extract(input, passphrase)
+        } finally {
+            runCatching { input.close() }
+        }
+        when (outcome) {
+            is com.turnypt.data.repository.StegoExtractOutcome.Extracted -> {
+                _state.value = _state.value.copy(
+                    stegoBusy = false,
+                    stegoExtracted = String(outcome.message, Charsets.UTF_8),
+                )
+            }
+            com.turnypt.data.repository.StegoExtractOutcome.NotACarrier -> {
+                _state.value = _state.value.copy(
+                    stegoBusy = false,
+                    stegoNotice = stegoMsg(R.string.stego_err_not_carrier),
+                )
+            }
+            is com.turnypt.data.repository.StegoExtractOutcome.Failed -> {
+                _state.value = _state.value.copy(
+                    stegoBusy = false,
+                    stegoNotice = stegoMsg(R.string.stego_err_failed),
+                )
+            }
+        }
+    }
+
+    /** Stego notices ride the existing UiNotice channel (arg when templated). */
+    private fun stegoMsg(res: Int, arg: String? = null): com.turnypt.app.companion.UiNotice =
+        com.turnypt.app.companion.UiNotice(res, arg)
+
     override fun onCleared() {
         pendingText = null
         pendingImageOp = null
@@ -1247,3 +1425,18 @@ class ToolsViewModel @Inject constructor(
 /** Local alias so the state class above stays short. */
 private fun UiNoticeOf(res: Int, arg: String? = null) =
     com.turnypt.app.companion.UiNotice(res, arg)
+
+/** v1.6.0: the carrier the stego screen picked (SAF). */
+data class StegoCarrierSource(
+    val uriString: String,
+    val displayName: String,
+    val sizeBytes: Long?,
+    val mime: String? = null,
+)
+
+/** v1.6.0: a finished stego embed — the share-ready card's data. */
+data class StegoEmbedDone(
+    val outputUriString: String,
+    val displayName: String,
+    val carrierKind: String,
+)

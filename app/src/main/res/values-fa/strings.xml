@@ -348,7 +348,7 @@
          بدون هیچ سامانه‌ای در پشت آن. -->
     <string name="home_quick_stego">پنهان‌کردن در فایل</string>
     <string name="stego_title">پنهان‌کردن در فایل</string>
-    <string name="stego_subtitle">پیام را درون یک فایل حامل استتار کنید — قابِ ویژگی استگانوگرافی پیش رو.</string>
+    <string name="stego_subtitle">پیامی را درون فایل PNG یا WAV پنهان کنید — یا یکی را آشکار کنید.</string>
     <string name="stego_step_carrier">۱ · فایل حامل</string>
     <string name="stego_carrier_hint">فایل به‌ظاهر بی‌گناهی را انتخاب کنید که پیام مخفی را حمل خواهد کرد. PNG، JPEG، WAV یا MP4.</string>
     <string name="stego_pick_carrier">انتخاب فایل حامل</string>
@@ -356,10 +356,35 @@
     <string name="stego_step_message">۲ · پیام مخفی</string>
     <string name="stego_message_label">پیامی که پنهان می‌شود</string>
     <string name="stego_embed_action">پنهان‌کردن پیام در فایل</string>
-    <string name="stego_coming_soon">پیش‌نمایش طراحی — جاسازی هنوز متصل نشده است.</string>
     <string name="stego_preview_title">پیش‌نمایش</string>
     <string name="stego_preview_ready">حامل %1$s آماده است</string>
     <string name="stego_preview_explainer">نتیجه را به‌صورت «فایل/سند» بفرستید، نه عکس یا صوت یا ویدیو — پیام‌رسان‌ها رسانه را بازکدگذاری می‌کنند و پیام مخفی را نابود می‌کنند.</string>
-    <string name="stego_preview_share">هم‌رسانی</string>
+    <string name="stego_preview_share">هم‌رسانی به‌صورت سند</string>
     <string name="stego_preview_reset">بستن پیش‌نمایش</string>
+    <string name="stego_subtitle_live">پیامی را درون یک فایل حامل پنهان کنید — یا پیامی را که برایتان پنهان شده آشکار کنید.</string>
+    <string name="stego_mode_hide">پنهان‌کردن پیام</string>
+    <string name="stego_mode_reveal">آشکارسازی پیام</string>
+    <string name="stego_carrier_hint_live">یک تصویر PNG یا یک فایل صوتی WAV را به‌عنوان حامل انتخاب کنید. فایل همچنان قابل‌مشاهده و پخش می‌ماند؛ پیام درون آن سوار می‌شود.</string>
+    <string name="stego_carrier_clear">تغییر</string>
+    <string name="stego_passphrase_title">عبارت عبور</string>
+    <string name="stego_passphrase_label">عبارت عبور استگانوگرافی</string>
+    <string name="stego_passphrase_hint">عبارت عبور تنها کلید است (هیچ مخاطب یا دورکلیدی استفاده نمی‌شود). آن را از مسیری دیگر بدهید — مثلاً حضوری یا از طریق پیام متنی رمزشده.</string>
+    <string name="stego_reveal_action">آشکارسازی پیام</string>
+    <string name="stego_revealed_title">پیام پنهان</string>
+    <string name="stego_err_open_failed">بازکردن فایل انتخاب‌شده ممکن نشد.</string>
+    <string name="stego_err_write_failed">نوشتن فایل خروجی ممکن نشد.</string>
+    <string name="stego_err_too_small">این فایل %1$s برای این پیام به‌اندازه کافی بزرگ نیست. حامل بزرگ‌تری برگزینید یا پیام را کوتاه‌تر کنید.</string>
+    <string name="stego_err_not_carrier">پیام مخفی‌ای پیدا نشد — یا این فایل حاملی ندارد، یا عبارت عبور اشتباه است.</string>
+    <string name="stego_err_failed">عملیات استگانوگرافی شکست خورد.</string>
+    <string name="stego_tier_title">چگونه امن بفرستید</string>
+    <string name="stego_tier_direct">امن‌ترین راه: انتقال مستقیم — USB، درایو ابری یا هر کپی فایل. بایت‌ها همان‌طور که رفتند می‌رسند.</string>
+    <string name="stego_tier_document">راه خوب: ارسال به‌صورت «سند/فایل». تلگرام و واتس‌اپ فایل‌های سند را بایت‌به‌بایت دست‌نخورده نگه می‌دارند.</string>
+    <string name="stego_tier_never">هرگز: به‌صورت عکس، صوت یا ویدیو نفرستید — پیام‌رسان‌ها رسانه را بازکدگذاری می‌کنند و بیت‌های مخفی نابود می‌شوند.</string>
+    <string name="settings_stego_matrix_title">ماتریس توانمندی فایل‌های حامل</string>
+    <string name="settings_stego_matrix_intro">کدام فایل‌ها می‌توانند پیام مخفی حمل کنند و چگونه امن جابه‌جا می‌شوند.</string>
+    <string name="settings_stego_matrix_png">تصویر PNG — حامل پشتیبانی‌شده. بدون‌افت: در هر انتقال بایت‌به‌بایت سالم می‌ماند؛ بازکدگذاری به‌صورت عکس نابودش می‌کند.</string>
+    <string name="settings_stego_matrix_wav">صوت WAV — حامل پشتیبانی‌شده. PCM بدون‌افت؛ در انتقال بایت‌به‌بایت به‌صورت فایل سالم می‌ماند.</string>
+    <string name="settings_stego_matrix_jpeg">تصویر JPEG — به‌عنوان حامل پشتیبانی نمی‌شود (بازکدگذاری باافت داده‌های LSB را نابود می‌کند). حامل تصویری، PNG است.</string>
+    <string name="settings_stego_matrix_mp4">ویدیوی MP4 — در این نسخه فعال نیست؛ در انتظار اثبات پیوست‌دنباله (گیت S0 پلن).</string>
+    <string name="settings_stego_matrix_lossy">رسانه‌های باافت (JPEG، MP3، AAC، ویدیوی بازکدگذاری‌شده) هرگز نمی‌توانند بیت مخفی حمل کنند — فقط فایل‌های بایت‌دقیق.</string>
 </resources>

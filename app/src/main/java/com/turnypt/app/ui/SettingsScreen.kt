@@ -350,6 +350,41 @@ fun SettingsScreen(
         }
 
         // ------------------------------------------------ about
+        // v1.6.0 (stego plan S5): the carrier capability matrix.
+        SectionCard(
+            title = stringResource(R.string.settings_stego_matrix_title),
+            icon = TurnyptIcons.Shield,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    stringResource(R.string.settings_stego_matrix_intro),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(R.string.settings_stego_matrix_png),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    stringResource(R.string.settings_stego_matrix_wav),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    stringResource(R.string.settings_stego_matrix_jpeg),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    stringResource(R.string.settings_stego_matrix_mp4),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    stringResource(R.string.settings_stego_matrix_lossy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         SectionCard(
             title = stringResource(R.string.settings_about_title),
             icon = TurnyptIcons.Info,

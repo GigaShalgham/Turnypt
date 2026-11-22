@@ -4,6 +4,9 @@
 > revision 1.1). Plain Markdown by project rule. This documents what is
 > SHIPPED so far and what the next stages add — the plan remains the
 > single source of truth for the design.
+>
+> **Phase 1 (S1–S5) is COMPLETE as of v1.6.0-beta.4.** Phase 2 (S6–S8,
+> file-in-file) remains open work.
 
 ## Shipped
 
@@ -29,6 +32,57 @@
   first cut used the full width and diverged (caught by the bijection
   tests).
 
+### S3 — WavCarrier (v1.6.0-beta.4)
+
+- **Pure-Kotlin RIFF parser**: walks the chunk list (word-aligned, odd
+  sizes padded), accepts PCM 16/24-bit only, validates fmt/data shapes
+  without allocating the PCM block (plan §5.3 memory discipline).
+- **One LSB per PCM sample** across all channels — the plan §3.2 WAV
+  row's chosen technique (amplitude domain: overwrite-LSB is the
+  standard; ±1 is a pixel-domain trick). Sample delta ≤ 1 always.
+- **Same two-zone layout** as PngCarrier: sequential salt+frame
+  prefix, keyed BitSpread body — the facade treats both carriers
+  uniformly.
+- 8 new JVM tests green: 16/24-bit round-trips, empty round-trip,
+  sample-delta null-test + header-untouched, wrong passphrase
+  `NotACarrier`, `CarrierTooSmall` pre-flight, corrupt/non-PCM parser
+  rejection, odd-chunk padding parse.
+
+### S4 — Facade + UI (v1.6.0-beta.4)
+
+- **StegoCipher facade** (`data:repository`, the MediaCipher twin per
+  plan §5.1): signature-sniffs PNG/WAV, embeds via the ciphers,
+  re-encodes PNG losslessly (`Bitmap.compress(PNG, 100)` — that IS the
+  §6.1 S2 "decoders still read the output" gate), passes WAV through
+  byte-exact except the LSBs. Passphrase-only key model (§4.4): the
+  facade consults NO contact, NO era, NO session — DI injects only
+  randomness, dispatchers and the BALANCED Argon2 profile.
+- **Outcomes mirror MediaCipher's discipline**: `Embedded`,
+  `CarrierTooSmall` (the §6.3 pre-flight UI state — carries needed/
+  available numbers), `NotACarrier`, `Failed`.
+- **StegoScreen is live** (was the plan's UI-only skeleton): SAF
+  OpenDocument carrier pick (PNG/WAV), hide/reveal mode switch,
+  message field, passphrase field (the ONLY key — the screen's
+  contact-picker ecosystem look is UX sugar; no unlock gating),
+  CreateDocument output, share-as-document intent on the result card,
+  and the reveal flow with the recovered message.
+- **ToolsViewModel** carries the stego state + ops on the shared
+  ToolsViewModel the tabs already use; stego notices ride the existing
+  UiNotice channel (res + arg, locale-resolved at render).
+
+### S5 — Platform guidance + verification (v1.6.0-beta.4)
+
+- **Three-tier transfer guidance** on the stego screen (plan §3.1):
+  direct transfer > document-mode share > never media-mode, always
+  visible with the embed flow, reinforced on the share-ready card.
+- **Settings capability matrix** (Settings → new card): PNG/WAV
+  supported; JPEG rejected with the reason; MP4 explicitly
+  pending-S0-gate; lossy media never carries bits.
+- **THREAT_MODEL.md adversary row 0**: the honest steganalysis claim —
+  concealment from casual inspection, not from a determined analyst;
+  content sealed regardless; no format oracle.
+- **Strings in both locales** (en + fa) for every new surface.
+
 ### S2 — PngCarrier (v1.6.0-beta.3)
 
 - **±1 LSB matching** over RGB; alpha never touched. Pixel delta ≤ 1
@@ -51,12 +105,18 @@
 - **CapacityPlanner**: pre-flight fit/headroom math;
   `CarrierTooSmall` is a UI state, not a runtime surprise (§6.3).
 
-## Not yet shipped
+## Not shipped (by plan decision)
 
-- S3 WAV/MP4 carriers; S4 repository facade + real StegoScreen wiring
-  (the screen is the plan's UI skeleton with NO crypto behind it);
-  S5 transfer-tier guidance + Settings matrix; Phase 2 (S6–S8,
-  file-in-file).
+- **MP4 carrier**: the plan gates tail-append on the S0 proof matrix
+  ("PENDING PROOF, not a default") and ships it off-by-default if any
+  rejection class exists; S0 did not clear it, so the carrier is NOT
+  built and the Settings matrix says exactly that.
+- **JPEG carrier** (APPn segment, plan §3.2): Phase 1 scope in the
+  table but not required for the message-in-file exit — PNG is the
+  primary image carrier. Open for a follow-up beta.
+- **Phase 2 (S6–S8, file-in-file)**: inner type=file record, capacity
+  planner UI for files, per-format carrier guidance, hardening +
+  golden-file corpus. All open.
 - The salt+frame prefix riding sequential slots is public structure by
   design (salt is not secret; the frame is tag-verified). Steganalysis
   hardening of the prefix (optionally folding it into the keyed zone
@@ -75,3 +135,7 @@
   `CarrierTooSmall` pre-flight, planner math, ±1 contract, per
   passphrase spread separation, collision diagnostic at capacity
   12 288.
+- WavCarrier: 16/24-bit round-trips, empty round-trip, sample-delta
+  null-test + header-untouched, wrong passphrase `NotACarrier`,
+  `CarrierTooSmall` pre-flight, parser rejection (corrupt, non-PCM,
+  odd-chunk padding).

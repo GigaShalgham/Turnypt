@@ -27,6 +27,7 @@ android {
 dependencies {
     api(project(":core:common"))
     api(project(":core:crypto"))
+    api(project(":core:stego"))
     api(project(":core:keys"))
     api(project(":core:messages"))
     api(project(":core:sessions"))

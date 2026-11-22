@@ -1,5 +1,7 @@
 package com.turnypt.app.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,40 +25,58 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.turnypt.app.R
 import com.turnypt.app.ToolsViewModel
+import com.turnypt.app.companion.ImageFiles
 
 /**
- * Stego frame, UI-only (stego plan §6.1 / S4): the skeleton the plan ships
- * first — every surface of the Phase 1 embed flow (carrier step, message
- * step, preview card) laid out in the app's v1.4 "Liquid Glass" component
- * set, with NO crypto, NO BitSpread, NO container behind it. Wiring to a
- * future :core:stego module comes only after the S0/S1 gates pass.
+ * Stego screen (stego plan §6.1 / S4): REAL wiring since v1.6.0-beta.4 —
+ * SAF carrier pick, passphrase-only Cks2 embed into PNG/WAV, extraction
+ * with the two-step boot, and the share-ready card with the document-
+ * mode guidance (plan §3.1's three transfer tiers live here as text;
+ * the Settings matrix lands with S5).
  *
- * v1.6.0-alpha.3 (user request: "no shared passphrase — this option must
- * follow the Turnypt ecosystem completely, using the same contacts
- * system"): the standalone passphrase section is GONE. The screen now
- * takes its recipient exactly like Encrypt/Decrypt do — the shared
- * ContactPicker plus, when the selected contact is locked, the SAME
- * unlock card (passphrase + fingerprint + suggestion gate) the rest of
- * the app uses, driven by the shared ToolsViewModel. Nothing here keeps
- * its own key material: when embedding eventually lands, the hidden
- * message will be sealed with the selected contact's session key — the
- * ecosystem's existing envelope — exactly like every other flow.
+ * The screen keeps the ecosystem's contact picker as UX sugar (whose
+ * carrier this is) but the CONTAINER consults no contact, no era, no
+ * session — passphrase-only per plan §4.4. The passphrase field below
+ * IS the key.
  */
 @Composable
 fun StegoScreen(viewModel: ToolsViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var carrierPicked by rememberSaveable { mutableStateOf(false) }
-    var carrierName by rememberSaveable { mutableStateOf("") }
-    var carrierFormat by rememberSaveable { mutableStateOf(StegoCarrierFormat.PNG) }
+    val context = LocalContext.current
     var message by rememberSaveable { mutableStateOf("") }
-    var showPreview by rememberSaveable { mutableStateOf(false) }
+    var passphrase by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(Unit) { viewModel.refresh() }
+
+    // SAF: pick the carrier (PNG or WAV) for embed or extract.
+    val pickCarrier = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.pickStegoCarrier(
+                uri,
+                ImageFiles.queryDisplayName(context, uri),
+                ImageFiles.querySize(context, uri),
+                ImageFiles.queryMimeType(context, uri),
+            )
+        }
+    }
+
+    // SAF: where the embedded carrier lands (CreateDocument, user-picked).
+    val createStego = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.embedStegoTo(uri, message, passphrase.toCharArray())
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -67,15 +87,25 @@ fun StegoScreen(viewModel: ToolsViewModel) {
     ) {
         ScreenHeader(
             title = stringResource(R.string.stego_title),
-            subtitle = stringResource(R.string.stego_subtitle),
+            subtitle = stringResource(R.string.stego_subtitle_live),
         )
 
-        if (state.contacts.isEmpty()) {
-            EmptyState(
-                icon = TurnyptIcons.People,
-                title = stringResource(R.string.contacts_empty_title),
-                body = stringResource(R.string.contacts_empty_body),
-            )
+        // ── Mode: hide | reveal ───────────────────────────────────────
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = { viewModel.setStegoExtractMode(false) },
+                enabled = state.stegoExtractMode,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.stego_mode_hide)) }
+            OutlinedButton(
+                onClick = { viewModel.setStegoExtractMode(true) },
+                enabled = !state.stegoExtractMode,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.stego_mode_reveal)) }
         }
 
         // ── Step 1: the carrier ────────────────────────────────────────
@@ -85,28 +115,28 @@ fun StegoScreen(viewModel: ToolsViewModel) {
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    stringResource(R.string.stego_carrier_hint),
+                    stringResource(R.string.stego_carrier_hint_live),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (carrierPicked) {
+                val carrier = state.stegoCarrier
+                if (carrier != null) {
                     CarrierPickedRow(
-                        name = carrierName,
-                        format = carrierFormat,
-                        onClear = {
-                            carrierPicked = false
-                            carrierName = ""
-                        },
+                        name = carrier.displayName,
+                        format = carrierFormatOf(carrier.mime),
+                        onClear = viewModel::clearStegoCarrier,
                     )
                 } else {
                     OutlinedButton(
                         onClick = {
-                            // UI frame only: no SAF picker is wired yet —
-                            // the real carrier adapters land with S4 of
-                            // the stego plan.
-                            carrierPicked = true
-                            carrierName = "carrier.png"
-                            carrierFormat = StegoCarrierFormat.PNG
+                            pickCarrier.launch(
+                                arrayOf(
+                                    "image/png",
+                                    "audio/x-wav",
+                                    "audio/wav",
+                                    "application/octet-stream",
+                                ),
+                            )
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -118,70 +148,36 @@ fun StegoScreen(viewModel: ToolsViewModel) {
             }
         }
 
-        // ── Step 2: the recipient — the Turnypt ecosystem, not a
-        // standalone passphrase. Same ContactPicker, same lock state
-        // per contact, same unlock flow as Encrypt/Decrypt. ──────────
+        // ── S5: the three transfer tiers, always visible (plan §6.1) ──
         SectionCard(
-            title = stringResource(R.string.encrypt_contact_label),
-            icon = TurnyptIcons.People,
+            title = stringResource(R.string.stego_tier_title),
+            icon = TurnyptIcons.Shield,
         ) {
-            ContactPicker(
-                contacts = state.contacts,
-                selectedContactId = state.selectedContactId,
-                unlocked = state.unlocked,
-                onContactSelected = viewModel::selectContact,
-            )
-        }
-
-        // The shared unlock card: shown exactly when the selected contact
-        // is locked — the same PassphraseInput (+ fingerprint offer, +
-        // honest suggestion gate) the Encrypt tab renders, reading the
-        // same ToolsViewModel state. Mirrors the private UnlockCard in
-        // EncryptScreen.kt (kept private there deliberately; this screen
-        // follows its shape rather than widening its visibility).
-        if (state.selectedContact != null && state.selectedContactId !in state.unlocked) {
-            SectionCard(
-                title = stringResource(
-                    R.string.unlock_for_title,
-                    state.unlockContactName ?: state.selectedContact!!.displayName,
-                ),
-                icon = TurnyptIcons.Lock,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(R.string.locked_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    PassphraseInput(
-                        label = stringResource(R.string.passphrase_label),
-                        buttonLabel = stringResource(R.string.unlock_encrypt_action),
-                        busy = state.busy,
-                        onSubmit = viewModel::unlockAndContinue,
-                        // v0.5.2: the suggestion appears at the password-entry
-                        // moment, but only when this side is CHOOSING the
-                        // passphrase (a locally created era, never unlocked)
-                        // — an imported era means the peer already picked it.
-                        allowSuggestion = state.suggestPassphrase,
-                        onCopySensitive = viewModel::copyPassphrase,
-                    )
-                    if (state.biometricOffered) {
-                        OutlinedButton(
-                            onClick = viewModel::requestBiometricUnlock,
-                            enabled = !state.busy,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.use_fingerprint)) }
-                    }
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    stringResource(R.string.stego_tier_direct),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(R.string.stego_tier_document),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(R.string.stego_tier_never),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
 
-        // ── Step 3: the hidden message ────────────────────────────────
-        SectionCard(
-            title = stringResource(R.string.stego_step_message),
-            icon = TurnyptIcons.Shield,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!state.stegoExtractMode) {
+            // ── Step 2: the hidden message ─────────────────────────────
+            SectionCard(
+                title = stringResource(R.string.stego_step_message),
+                icon = TurnyptIcons.Shield,
+            ) {
                 OutlinedTextField(
                     value = message,
                     onValueChange = { message = it },
@@ -190,57 +186,134 @@ fun StegoScreen(viewModel: ToolsViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-        }
 
-        // ── The action ────────────────────────────────────────────────
-        Button(
-            onClick = { showPreview = true },
-            enabled = carrierPicked &&
-                state.selectedContact != null &&
-                state.selectedContactId in state.unlocked &&
-                message.isNotEmpty(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 48.dp),
-        ) {
-            Text(stringResource(R.string.stego_embed_action))
-        }
-        Text(
-            stringResource(R.string.stego_coming_soon),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        // ── Preview (what the completion card will become) ────────────
-        if (showPreview) {
+            // ── Step 3: the passphrase (the ONLY key — plan §4.4) ─────
             SectionCard(
-                title = stringResource(R.string.stego_preview_title),
-                icon = TurnyptIcons.CheckCircle,
+                title = stringResource(R.string.stego_passphrase_title),
+                icon = TurnyptIcons.Lock,
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusChip(
-                        text = stringResource(
-                            R.string.stego_preview_ready,
-                            carrierFormat.label,
-                        ),
-                        positive = true,
-                        icon = TurnyptIcons.CheckCircle,
-                    )
                     Text(
-                        stringResource(R.string.stego_preview_explainer),
+                        stringResource(R.string.stego_passphrase_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = { /* real share intent arrives with S4 */ },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(stringResource(R.string.stego_preview_share))
+                    OutlinedTextField(
+                        value = passphrase,
+                        onValueChange = { passphrase = it },
+                        label = { Text(stringResource(R.string.stego_passphrase_label)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+
+            // ── The action ────────────────────────────────────────────
+            Button(
+                onClick = {
+                    createStego.launch(
+                        state.stegoCarrier?.displayName ?: "carrier.png",
+                    )
+                },
+                enabled = state.stegoCarrier != null &&
+                    message.isNotEmpty() &&
+                    passphrase.isNotEmpty() &&
+                    !state.stegoBusy,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(stringResource(R.string.stego_embed_action))
+            }
+
+            state.stegoNotice?.let { StegoNoticeRow(notice = it) }
+
+            // ── The share-ready result card ──────────────────────────
+            state.stegoResult?.let { result ->
+                SectionCard(
+                    title = stringResource(R.string.stego_preview_title),
+                    icon = TurnyptIcons.CheckCircle,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatusChip(
+                            text = stringResource(
+                                R.string.stego_preview_ready,
+                                result.carrierKind,
+                            ),
+                            positive = true,
+                            icon = TurnyptIcons.CheckCircle,
+                        )
+                        Text(
+                            stringResource(R.string.stego_preview_explainer),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = {
+                                    ImageShare.uri(
+                                        context,
+                                        android.net.Uri.parse(result.outputUriString),
+                                        "application/octet-stream",
+                                        context.getString(R.string.stego_preview_share),
+                                    )
+                                },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(stringResource(R.string.stego_preview_share))
+                            }
+                            OutlinedButton(
+                                onClick = { viewModel.clearStegoCarrier() },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(stringResource(R.string.stego_preview_reset))
+                            }
                         }
+                    }
+                }
+            }
+        } else {
+            // ── Reveal mode ──────────────────────────────────────────
+            SectionCard(
+                title = stringResource(R.string.stego_passphrase_title),
+                icon = TurnyptIcons.Lock,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = passphrase,
+                        onValueChange = { passphrase = it },
+                        label = { Text(stringResource(R.string.stego_passphrase_label)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.extractStegoFrom(passphrase.toCharArray())
+                        },
+                        enabled = state.stegoCarrier != null &&
+                            passphrase.isNotEmpty() &&
+                            !state.stegoBusy,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
+                    ) {
+                        Text(stringResource(R.string.stego_reveal_action))
+                    }
+                }
+            }
+
+            state.stegoNotice?.let { StegoNoticeRow(notice = it) }
+
+            state.stegoExtracted?.let { text ->
+                SectionCard(
+                    title = stringResource(R.string.stego_revealed_title),
+                    icon = TurnyptIcons.CheckCircle,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(text, style = MaterialTheme.typography.bodyLarge)
                         OutlinedButton(
-                            onClick = { showPreview = false },
-                            modifier = Modifier.weight(1f),
+                            onClick = { viewModel.clearStegoCarrier() },
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(R.string.stego_preview_reset))
                         }
@@ -255,15 +328,33 @@ fun StegoScreen(viewModel: ToolsViewModel) {
     }
 }
 
+/** Notices ride the shared UiNotice shape (res + arg, resolved at render). */
+@Composable
+private fun StegoNoticeRow(notice: com.turnypt.app.companion.UiNotice) {
+    val text = notice.arg?.let {
+        stringResource(notice.res, it)
+    } ?: stringResource(notice.res)
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+    )
+}
+
+/** Maps a picked carrier's MIME to the display format. */
+private fun carrierFormatOf(mime: String?): StegoCarrierFormat = when {
+    mime == null -> StegoCarrierFormat.PNG
+    mime.contains("wav", ignoreCase = true) -> StegoCarrierFormat.WAV
+    else -> StegoCarrierFormat.PNG
+}
+
 /** Carrier formats the stego plan §3.2 matrix covers. */
 enum class StegoCarrierFormat(val label: String) {
     PNG("PNG image"),
-    JPEG("JPEG image"),
     WAV("WAV audio"),
-    MP4("MP4 video"),
 }
 
-/** Picked-carrier row: format chip, name, ready hint. */
+/** Picked-carrier row: format chip, name, clear. */
 @Composable
 private fun CarrierPickedRow(
     name: String,
@@ -274,22 +365,18 @@ private fun CarrierPickedRow(
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        androidx.compose.material3.FilterChip(
-            selected = true,
-            onClick = onClear,
-            label = { Text(format.label) },
+        StatusChip(
+            text = format.label,
+            positive = true,
+            icon = TurnyptIcons.CheckCircle,
         )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                stringResource(R.string.stego_carrier_ready),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Text(
+            name,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        OutlinedButton(onClick = onClear) {
+            Text(stringResource(R.string.stego_carrier_clear))
         }
     }
 }

@@ -12,6 +12,18 @@
 
 ## Adversaries
 
+0. **Steganalysis of a shared carrier (v1.6.0 stego)**: a PNG/WAV carrier
+   with a hidden CKS2 stream conceals *existence* from casual inspection,
+   platform thumbnails and untutored eyes — NOT from a determined
+   steganalyst (chi-square / RS / sample-pair analysis can flag dense
+   LSB planes; the plan caps occupancy and uses ±1 matching + keyed
+   spread to slow, not stop, them). Content is AES-256-GCM sealed, so
+   even a flagged carrier yields nothing without the passphrase. There
+   is no public marker: no magic bytes, no identifiable structure — a
+   wrong passphrase dies at the frame's GCM tag, giving the analyst no
+   oracle to brute-force against. The honest claim: steganography hides
+   the fact of the message from the casual observer; cryptography hides
+   the content from everyone.
 1. **Network observer** (carrier, ISP, messaging-platform operator):
    sees `CK1:` ciphertexts. Learns message *length*, *timing*, *participants
    of the underlying transport* — but not content. Turnypt does **not**

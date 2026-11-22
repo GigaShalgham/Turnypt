@@ -231,8 +231,8 @@ sealed class StegoError(description: String) : Exception(description) {
     object NotACarrier : StegoError("not a stego carrier (or wrong passphrase)")
 
     /** The carrier is too small for the payload (pre-flight, §6.3). */
-    class CarrierTooSmall(needed: Long, available: Long) :
-        StegoError("carrier too small: need $needed bits, have $available")
+    class CarrierTooSmall(val neededBits: Long, val availableBits: Long) :
+        StegoError("carrier too small: need $neededBits bits, have $availableBits")
 
     /** The embedded stream is short/cut — extraction failed mid-body. */
     object Truncated : StegoError("embedded stream truncated")

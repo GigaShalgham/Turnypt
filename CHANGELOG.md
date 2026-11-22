@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.4] - 2026-11-22 — stego Phase 1 COMPLETE (prerelease)
+
+### Advanced cryptography plan — S3/S4/S5 (Phase 1 exit)
+
+- **WavCarrier (S3)**: pure-Kotlin RIFF parser (word-aligned chunk walk,
+  PCM 16/24-bit only), one LSB per sample, the same two-zone layout as
+  PngCarrier (sequential salt+frame prefix, keyed BitSpread body).
+  Sample delta ≤ 1 always; header bytes never touched. 8 new JVM tests.
+- **StegoCipher facade (S4)**: the MediaCipher twin in `data:repository` —
+  signature sniffing, PNG re-encoded losslessly via Bitmap.compress,
+  WAV passed through byte-exact except LSBs, outcomes mirroring
+  MediaEncryptOutcome discipline (Embedded / CarrierTooSmall with
+  numbers / NotACarrier / Failed). Passphrase-only per plan §4.4.
+- **StegoScreen live (S4)**: SAF carrier pick, hide/reveal modes,
+  message + passphrase fields, CreateDocument output, share-as-document
+  on the result card, reveal flow with the recovered message; notices
+  via the shared UiNotice channel. All strings en + fa.
+- **S5 — guidance + matrix**: three-tier transfer guidance on the
+  stego screen (direct > document > never media), the Settings carrier
+  capability matrix (PNG/WAV supported; JPEG rejected with reason; MP4
+  pending S0 gate; lossy never), and the THREAT_MODEL.md steganalysis
+  adversary row (the honest concealment claim).
+- MP4 carrier deliberately NOT shipped (plan S0 gate not cleared);
+  documented in the matrix and STEGO.md.
+
+
 ## [1.6.0-beta.3] - 2026-11-22 — stego S2 lands (prerelease)
 
 ### Advanced cryptography plan — S2 (image carrier)
