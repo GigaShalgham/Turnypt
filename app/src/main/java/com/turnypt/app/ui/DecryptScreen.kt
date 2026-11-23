@@ -150,6 +150,10 @@ fun DecryptScreen(
                     OutlinedButton(onClick = viewModel::openClipboardHistory) {
                         Text(stringResource(R.string.action_view_clipboard))
                     }
+                    // v1.6.0-beta.9 (user report: "no Done button in the
+                    // UI that closes the keyboard") — the in-app button,
+                    // in the field's own row.
+                    KeyboardDoneButton()
                 }
             }
         } else {

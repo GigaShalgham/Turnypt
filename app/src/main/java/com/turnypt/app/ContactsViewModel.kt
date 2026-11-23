@@ -292,6 +292,11 @@ class ContactsViewModel @Inject constructor(
             }
             val key = biometricContactKeyFor(contactId)
                 ?: run { _biometricOffered.value = false; return@launch }
+            // v1.6.0-beta.9 (user report: "the fingerprint button on that
+            // page sometimes doesn't come"): only honor this reading if the
+            // dialog is STILL on this contact — a late landing computed
+            // for the PREVIOUS contact used to flip the new dialog's offer.
+            if (dialogContactId != contactId) return@launch
             _biometricOffered.value = biometricStore.hasWrapped(key)
         }
     }

@@ -38,6 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -446,6 +448,13 @@ fun PassphraseInput(
             ),
             modifier = Modifier.fillMaxWidth(),
         )
+        // v1.6.0-beta.9 (user report: "the screens with a text input
+        // still have no Done button in the UI that closes the keyboard"):
+        // the in-app Done button, right under the field, on EVERY
+        // passphrase surface this shared input renders (unlock cards on
+        // Encrypt / Decrypt / stego, the contact detail dialog, the
+        // companion sheets).
+        KeyboardDoneButton()
         // v0.4.0: live strength hint while the user types.
         PassphraseStrengthHint(passphrase)
         if (allowSuggestion && onCopySensitive != null) {
@@ -738,6 +747,17 @@ fun SettingSwitchRow(
  * SOLID state under-fill (unlocked keeps its unmistakable green channel —
  * state color must not shift with the backdrop), locked stays neutral
  * glass. Same 40dp size and reading.
+ *
+ * v1.6.0-beta.9 (user report: "the initial of a contact name sits off
+ * center — top-anchored, not in the middle"): the initial now centers
+ * HONESTLY. `wrapContentSize(Center)` was never the problem — the glyph
+ * box was: `titleMedium` carries a tall line height plus Android's
+ * includeFontPadding ascent/descent, so the VISIBLE glyph rode high
+ * inside the 40dp circle (worst for Latin caps; barely visible for
+ * Persian). The fix is the standard Compose recipe, all three parts:
+ * a Box with contentAlignment(Center), a style whose lineHeight EQUALS
+ * its fontSize (no extra leading), and PlatformTextStyle with
+ * includeFontPadding=false (no top/bottom font padding on API<29).
  */
 @Composable
 fun ContactAvatar(
@@ -754,12 +774,23 @@ fun ContactAvatar(
             .size(40.dp)
             .background(stateFill, CircleShape)
             .glassSurface(glass, CircleShape, tint = glass.tint.copy(alpha = glass.tint.alpha * 0.45f)),
+        contentAlignment = Alignment.Center,
     ) {
+        // Persian names whose first codepoint is a joiner (ZWNJ or the
+        // Arabic letters that join forward) would render as an invisible
+        // or isolated glyph — walk to the first LETTER instead of
+        // blindly take(1)ing the first codepoint.
+        val initial = name.trim().firstOrNull { it.isLetter() || it.isDigit() }
+            ?.uppercaseChar() ?: '?'
         Text(
-            text = name.trim().take(1).uppercase(),
-            style = MaterialTheme.typography.titleMedium,
+            text = initial.toString(),
+            style = MaterialTheme.typography.titleMedium.copy(
+                lineHeight = MaterialTheme.typography.titleMedium.fontSize,
+                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                    includeFontPadding = false,
+                ),
+            ),
             color = fg,
-            modifier = Modifier.wrapContentSize(Alignment.Center),
         )
     }
 }
@@ -770,6 +801,34 @@ fun BusyLine(visible: Boolean) {
     if (visible) {
         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
     }
+}
+
+/**
+ * v1.6.0-beta.9 (user report: "the screens with a text input still have
+ * no Done button in the UI that closes the keyboard — something came on
+ * the keyboard but it doesn't work either"): an IN-APP "Done / تمام"
+ * button that closes the software keyboard and clears focus — a real
+ * affordance on the screen, not a keyboard-key that some IMEs ignore.
+ *
+ * Every text-bearing screen (Encrypt, Decrypt, stego message, unlock
+ * cards, passphrase dialogs, the companion sheet, the contact form)
+ * now renders this right after its field row. It uses BOTH the
+ * keyboard controller (hides the IME) and the focus manager (clears the
+ * focus so the field stops being the IME target), which is why the
+ * keyboard actually STAYS closed — tapping an IME Done key alone could
+ * leave the field focused and the keyboard re-appearing.
+ */
+@Composable
+fun KeyboardDoneButton(modifier: Modifier = Modifier) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focus = LocalFocusManager.current
+    OutlinedButton(
+        onClick = {
+            keyboard?.hide()
+            focus.clearFocus(force = true)
+        },
+        modifier = modifier,
+    ) { Text(stringResourceCompat(R.string.action_done)) }
 }
 
 /**

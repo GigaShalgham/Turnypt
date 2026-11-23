@@ -349,6 +349,10 @@ private fun AddContactDialog(
                         onDone = { },
                     ),
                 )
+                // v1.6.0-beta.9 (user report: "no Done button in the UI
+                // that closes the keyboard") — the in-app button, right
+                // under the form's last field.
+                KeyboardDoneButton()
                 Text(
                     stringResource(R.string.contact_invite_help),
                     fontSize = 12.sp,
@@ -516,6 +520,10 @@ private fun ContactDetailDialog(
                             onDone = { },
                         ),
                     )
+                    // v1.6.0-beta.9 (user report: "no Done button in the
+                    // UI that closes the keyboard") — the in-app button,
+                    // under the dialog's passphrase field.
+                    KeyboardDoneButton()
                     if (suggestPassphrase) {
                         // v0.5.2: strong-passphrase suggestion AT the entry
                         // point (fills the field above; copies sensitively).

@@ -138,6 +138,12 @@ data class ToolsUiState(
     val imageDecryptResult: ImageDecryptDone? = null,
     /** True after the decrypted file was saved via CreateDocument. */
     val imageSavedAfterDecrypt: Boolean = false,
+    /**
+     * v1.6.0-beta.9: true for a few seconds after the encrypted FILE was
+     * written through SAF — the encrypt tab's result card shows the same
+     * "Saved ✓" tick the decrypt tab shows.
+     */
+    val imageSavedAfterEncrypt: Boolean = false,
     /** The user's cipher preference (null until loaded). */
     val cipherPreference: CipherPreference? = null,
     /**
@@ -181,6 +187,13 @@ data class ToolsUiState(
     val stegoEcosystemMode: Boolean = true,
     /** Extract-side failure detail (wrong passphrase / not a carrier). */
     val stegoNotice: com.turnypt.app.companion.UiNotice? = null,
+    /**
+     * v1.6.0-beta.9 (user report: "after it saves, show something on
+     * screen so I know it saved"): true for a few seconds after a stego
+     * embed ACTUALLY wrote its output through SAF — the result card then
+     * carries a visible "Saved ✓ <name>" line, not only the embed card.
+     */
+    val stegoSavedTick: Boolean = false,
 ) {
     val selectedContact: Contact?
         get() = contacts.firstOrNull { it.id == selectedContactId }
@@ -422,6 +435,7 @@ class ToolsViewModel @Inject constructor(
             imageEncryptResult = null,
             imageDecryptResult = null,
             imageSavedAfterDecrypt = false,
+            imageSavedAfterEncrypt = false,
             notice = null,
         )
     }
@@ -431,6 +445,7 @@ class ToolsViewModel @Inject constructor(
         _state.value = _state.value.copy(
             pickedImage = null,
             imageEncryptResult = null,
+            imageSavedAfterEncrypt = false,
             imageProgressBytes = 0,
             imageProgressTotal = null,
         )
@@ -611,8 +626,18 @@ class ToolsViewModel @Inject constructor(
                         algorithmName = displayNameOf(outcome.algorithm),
                         sizeText = ImageFiles.formatSize(outcome.plaintextBytes),
                     ),
+                    // v1.6.0-beta.9 (user report: "after it saves, show
+                    // something on screen so I know it saved"): the encrypt
+                    // tab's file card now carries the same visible tick the
+                    // decrypt tab shows after saving.
+                    imageSavedAfterEncrypt = true,
                     notice = null,
                 )
+                // The tick clears itself after 5 seconds.
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(5_000)
+                    _state.value = _state.value.copy(imageSavedAfterEncrypt = false)
+                }
             }
             MediaEncryptOutcome.NeedsUnlock -> _state.value = _state.value.copy(
                 busy = false,
@@ -879,9 +904,21 @@ class ToolsViewModel @Inject constructor(
 
     // ------------------------------------------------------------ biometric
 
-    /** v0.3.0: recompute whether the fingerprint button should be offered. */
+    /**
+     * v1.6.0-beta.9: monotonic guard for the async offer computation — a
+     * STALE launch finishing AFTER a newer one used to overwrite the
+     * fresh `biometricOffered` with an older reading (the visible symptom
+     * of "the fingerprint button sometimes doesn't come": the offer was
+     * computed for the contact/era before the navigation, landed late,
+     * and switched the button OFF after the correct ON landed).
+     */
+    private var biometricOfferEpoch = 0L
+
+    /** v1.3.0: recompute whether the fingerprint button should be offered. */
     fun refreshBiometricOffer() {
+        val epoch = ++biometricOfferEpoch
         launchSafely {
+            if (epoch != biometricOfferEpoch) return@launchSafely
             val enabled = settings.settings.first().biometricUnlockEnabled
             if (!enabled || !biometricStore.isDeviceCapable()) {
                 _state.value = _state.value.copy(biometricOffered = false)
@@ -891,6 +928,7 @@ class ToolsViewModel @Inject constructor(
                 _state.value = _state.value.copy(biometricOffered = false)
                 return@launchSafely
             }
+            if (epoch != biometricOfferEpoch) return@launchSafely
             _state.value = _state.value.copy(
                 biometricOffered = biometricStore.hasWrapped(contactKey),
             )
@@ -1452,15 +1490,32 @@ class ToolsViewModel @Inject constructor(
         when (outcome) {
             is com.turnypt.data.repository.StegoEmbedOutcome.Embedded -> {
                 if (contactId != null) settings.setLastContactId(contactId.value)
+                // v1.6.0-beta.9: the saved name comes from the OUTPUT uri
+                // SAF actually wrote (queryDisplayName) with the CARRIER's
+                // own extension as fallback — the old fallback could name a
+                // nameless uri "carrier" with no extension, which some
+                // sharesheets then re-typed by guess.
+                val savedName = streams.queryDisplayName(outputUri)
+                    ?: run {
+                        val carrierExt = carrier.displayName.substringAfterLast('.', "")
+                        val base = carrier.displayName.substringBeforeLast('.').ifBlank { "carrier" }
+                        if (carrierExt.isBlank()) base else "$base.$carrierExt"
+                    }
                 _state.value = _state.value.copy(
                     stegoBusy = false,
+                    stegoSavedTick = true,
                     stegoResult = StegoEmbedDone(
                         outputUriString = outputUri.toString(),
-                        displayName = streams.queryDisplayName(outputUri)
-                            ?: carrier.displayName,
+                        displayName = savedName,
                         carrierKind = outcome.carrierKind.label,
                     ),
                 )
+                // v1.6.0-beta.9: the tick clears itself after 5s — a sticky
+                // "saved" line would go stale after the next action.
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(5_000)
+                    _state.value = _state.value.copy(stegoSavedTick = false)
+                }
             }
             is com.turnypt.data.repository.StegoEmbedOutcome.CarrierTooSmall -> {
                 _state.value = _state.value.copy(
@@ -1526,6 +1581,13 @@ class ToolsViewModel @Inject constructor(
                     stegoNotice = null,
                 )
                 pendingStegoExtract = true
+                // v1.6.0-beta.9 (user report: "the fingerprint button on
+                // that page sometimes doesn't come"): this was the missing
+                // call — the reveal side surfaced the unlock card WITHOUT
+                // recomputing the biometric offer, so a contact that HAS a
+                // remembered wrap showed NO fingerprint button here until
+                // some other screen happened to refresh it.
+                refreshBiometricOffer()
             }
             com.turnypt.data.repository.StegoExtractOutcome.NotACarrier -> {
                 _state.value = _state.value.copy(

@@ -64,7 +64,18 @@ import com.turnypt.data.preferences.CipherPreference
  */
 object ImageShare {
 
-    /** Share any URI the app can serve (SAF outputs via clipData grant). */
+    /**
+     * Share any URI the app can serve (SAF outputs via clipData grant).
+     *
+     * v1.6.0-beta.9: a send with a stream ALSO carries EXTRA_TITLE — the
+     * display name of the shared file. Several sharesheets and receiver
+     * apps (Telegram / WhatsApp included) take the visible file name from
+     * there when the uri's provider does not serve one, and some of them
+     * re-type the file from the name's EXTENSION when the intent type is
+     * generic — the missing title is where "the extension changed and
+     * broke the file" came from. The name comes from the uri's last path
+     * segment (FileProvider serves the real file name) or the caller.
+     */
     fun uri(context: Context, uri: Uri, mime: String, title: String? = null) {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = mime
@@ -73,6 +84,20 @@ object ImageShare {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         val launch = title?.let { Intent.createChooser(send, it) } ?: send
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(launch) }
+    }
+
+    /** Share a content/file uri carrying the output's display name. */
+    fun uriWithName(context: Context, uri: Uri, mime: String, fileName: String, chooserTitle: String? = null) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TITLE, fileName)
+            clipData = ClipData.newRawUri(fileName, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val launch = chooserTitle?.let { Intent.createChooser(send, it) } ?: send
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { context.startActivity(launch) }
     }
@@ -367,6 +392,16 @@ fun EncryptedFileCard(
         ),
         icon = TurnyptIcons.FileDoc,
     ) {
+        // v1.6.0-beta.9 (user report: "after it saves, show something on
+        // screen so I know it saved"): the same visible tick the decrypt
+        // tab shows after saving — for 5 seconds after the SAF write.
+        if (state.imageSavedAfterEncrypt) {
+            Text(
+                stringResource(R.string.image_saved_ok),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         Text(
             stringResource(R.string.image_result_saved_as, result.displayName),
             style = MaterialTheme.typography.bodyMedium,

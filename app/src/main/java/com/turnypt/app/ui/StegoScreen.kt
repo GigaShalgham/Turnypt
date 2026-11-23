@@ -126,6 +126,12 @@ fun StegoScreen(viewModel: ToolsViewModel, biometrics: BiometricKeyStore) {
     }
 
     // SAF: where the embedded carrier lands (CreateDocument, user-picked).
+    // v1.6.0-beta.9: stays octet-stream on purpose — the SUGGESTED NAME
+    // carries the carrier's own name (and its extension), and a typed SAF
+    // dialog would force its own extension onto the output on several
+    // providers (the seed of the "changed the extension and it broke"
+    // reports). The output is the carrier's bytes plus a trailer; it must
+    // keep the carrier's own name and extension, period.
     val createStego = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri ->
@@ -205,6 +211,10 @@ fun StegoScreen(viewModel: ToolsViewModel, biometrics: BiometricKeyStore) {
                     keyboardActions = KeyboardActions(onDone = { }),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // v1.6.0-beta.9 (user report: "no Done button in the UI
+                // that closes the keyboard") — the in-app button, right
+                // under the message field.
+                KeyboardDoneButton()
             }
 
             // ── The contact — the ONLY key model (beta.8 decree) ────
@@ -275,6 +285,19 @@ fun StegoScreen(viewModel: ToolsViewModel, biometrics: BiometricKeyStore) {
                     title = stringResource(R.string.stego_preview_title),
                     icon = TurnyptIcons.FileDoc,
                 ) {
+                    // v1.6.0-beta.9 (user report: "after it saves, show
+                    // something on screen so I know it saved"): the FIRST
+                    // line of the card is the visible saved-tick — the
+                    // same confirmation the decrypted-image card shows
+                    // after ITS save. It fades after 5 seconds, but the
+                    // "Saved as <name>" line below keeps naming the file.
+                    if (state.stegoSavedTick) {
+                        Text(
+                            stringResource(R.string.image_saved_ok),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     Text(
                         stringResource(R.string.stego_result_saved_as, result.displayName),
                         style = MaterialTheme.typography.bodyMedium,
@@ -429,17 +452,25 @@ fun StegoScreen(viewModel: ToolsViewModel, biometrics: BiometricKeyStore) {
  * The old path handed the raw SAF uri with a hardcoded
  * `application/octet-stream` — many apps (Telegram included) treat that
  * as an anonymous blob: no file name, no type, sometimes silently
- * re-encoded. The fix goes through the app's OWN FileProvider:
+ * re-encoded. The fix goes through the app's OWN FileProvider.
  *
- *  1. the SAF output is copied into the app's private cache (a real
- *     file with the carrier's real name — song.mp3 stays song.mp3);
- *  2. the file is shared as a content uri with the carrier's OWN
- *     advertised MIME (audio for a song, image for a picture,
- *     video for a clip) — the receiver sees a genuine FILE of the
- *     type it already knows how to receive;
- *  3. the cache copy is marked delete-on-share (FLAG_GRANT_READ is
- *     enough for the receiver; the file wipes on the next embed or on
- *     app exit — the cache dir is the app's own).
+ * v1.6.0-beta.9 (user report: "some files, e.g. a song, still go wrong —
+ * it changes the extension and that breaks it"), three hardening points:
+ *
+ *  1. the cache copy keeps the SAF output's DISPLAY NAME EXACTLY (each
+ *     copy lives in its own unique subdirectory, so two files with the
+ *     same name never collide and NO prefix is prepended — the receiver
+ *     sees "song.mp3", not "stego_share_1732456_song.mp3", and some
+ *     messengers derive their own type guess from the NAME when the
+ *     intent type is generic, which is exactly where the wrong-extension
+ *     breakage came from);
+ *  2. the MIME is resolved from the NAME'S REAL EXTENSION (the last dot
+ *     of the display name — Persian and other non-ASCII names broke
+ *     MimeTypeMap.getFileExtensionFromUrl, which URL-decodes and mangles
+ *     them, falling back to the anonymous octet-stream), NOT from the
+ *     carrier's guess when the two disagree;
+ *  3. the file-size gate now reads the copy's real length (the old
+ *     `available()` pre-read guess could refuse big-but-fine files).
  */
 object StegoShare {
 
@@ -448,9 +479,9 @@ object StegoShare {
 
     /**
      * Copies [result]'s SAF output into the app cache and shares it as a
-     * real file with the carrier's [carrierMime] (fallback: the honest
-     * generic document type). Falls back to a direct SAF grant share
-     * (still as a file) when the copy fails — never to a text/blob send.
+     * real file with the output's display name and the extension-derived
+     * MIME. Falls back to a direct SAF grant share (still as a file)
+     * when the copy fails — never to a text/blob send.
      */
     fun shareResult(
         context: android.content.Context,
@@ -470,7 +501,12 @@ object StegoShare {
             }.getOrNull()
         }
         if (fileUri != null) {
-            ImageShare.uri(context, fileUri, resolveMime(carrierMime, cache), null)
+            ImageShare.uriWithName(
+                context,
+                fileUri,
+                resolveMime(context, carrierMime, cache),
+                result.displayName.substringAfterLast('/').ifBlank { "carrier" },
+            )
             return
         }
         // Copy failed (huge file / stream hiccup): grant-share the SAF
@@ -478,45 +514,104 @@ object StegoShare {
         ImageShare.uri(
             context,
             uri,
-            resolveMime(carrierMime, null),
+            resolveMime(context, carrierMime, null),
             context.getString(R.string.stego_preview_share),
         )
     }
 
     /**
-     * The MIME the share carries: the carrier's advertised type when the
-     * system knows one, else the honest application/octet-stream (the
-     * file IS bytes; the name carries what it is).
+     * The MIME the share carries, in honesty order: the SAF provider's
+     * own type for the OUTPUT uri (never a guess), else the extension of
+     * the output's display name mapped through MimeTypeMap, else the
+     * carrier's advertised type, else the honest generic — a file whose
+     * type nobody knows is still a FILE (the name carries what it is).
      */
-    private fun resolveMime(carrierMime: String?, cache: java.io.File?): String {
+    private fun resolveMime(
+        context: android.content.Context,
+        carrierMime: String?,
+        cache: java.io.File?,
+    ): String {
+        val providerType = cache?.let { file ->
+            runCatching {
+                androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                ).let { context.contentResolver.getType(it) }
+            }.getOrNull()
+        }
+        if (!providerType.isNullOrBlank() && providerType != "*/*") return providerType
+        extensionOf(cache?.name)?.let { ext ->
+            runCatching {
+                android.webkit.MimeTypeMap.getSingleton()
+                    .getMimeTypeFromExtension(ext)
+            }.getOrNull()?.let { return it }
+        }
         if (!carrierMime.isNullOrBlank() && carrierMime != "*/*") return carrierMime
-        return runCatching {
-            cache?.let { android.webkit.MimeTypeMap.getFileExtensionFromUrl(it.name) }
-                ?.let { ext ->
-                    android.webkit.MimeTypeMap.getSingleton()
-                        .getMimeTypeFromExtension(ext.lowercase())
-                }
-        }.getOrNull() ?: "application/octet-stream"
+        return "application/octet-stream"
     }
 
+    /** The extension after the LAST dot, lowercased, no URL decoding. */
+    private fun extensionOf(name: String?): String? = stegoShareExtensionOf(name)
+
     /**
-     * Copies the SAF output into a fresh cache file named after the
-     * carrier (bounded by [MAX_CACHE_BYTES]; a larger file stays on the
-     * direct-grant path — the messenger streams it from SAF).
+     * Copies the SAF output into a fresh UNIQUE cache subdirectory whose
+     * ONLY file carries the output's display name unchanged — bounded by
+     * [MAX_CACHE_BYTES] (the copy's real length, not a pre-read guess); a
+     * larger file stays on the direct-grant path (the messenger streams
+     * it from SAF).
      */
     private fun copyToCache(
         context: android.content.Context,
         uri: android.net.Uri,
         displayName: String,
     ): java.io.File? {
+        // Keep the name the SAF output was saved under; a path-traversal
+        // or blank name falls back to the honest "carrier" (the sharesheet
+        // then asks the receiver to name it — better than a broken send).
         val safe = displayName.substringAfterLast('/').takeIf { it.isNotBlank() } ?: "carrier"
-        val target = java.io.File(context.cacheDir, "stego_share_${System.currentTimeMillis()}_$safe")
+        val dir = java.io.File(
+            context.cacheDir,
+            "stego_share_${System.currentTimeMillis()}",
+        ).apply { mkdirs() }
+        val target = java.io.File(dir, safe)
         context.contentResolver.openInputStream(uri)?.use { input ->
-            val size = input.available()
-            if (size > MAX_CACHE_BYTES) return null
-            target.outputStream().use { output -> input.copyTo(output) }
+            val output = target.outputStream()
+            try {
+                var total = 0L
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    total += read
+                    if (total > MAX_CACHE_BYTES) {
+                        output.close()
+                        target.delete()
+                        dir.deleteRecursively()
+                        return null
+                    }
+                    output.write(buffer, 0, read)
+                }
+                output.flush()
+            } finally {
+                runCatching { output.close() }
+            }
         } ?: return null
-        return target
+        return target.takeIf { it.length() > 0 }
     }
+}
+
+/**
+ * v1.6.0-beta.9: the share-name extension rule, extracted for the JVM
+ * tests — the extension is taken from the LAST dot of the display name
+ * VERBATIM (lowercased), never through MimeTypeMap.getFileExtensionFromUrl
+ * (which URL-decodes and mangles Persian and other non-ASCII names).
+ */
+internal fun stegoShareExtensionOf(name: String?): String? {
+    if (name.isNullOrBlank()) return null
+    val dot = name.lastIndexOf('.')
+    if (dot <= 0 || dot == name.length - 1) return null
+    val ext = name.substring(dot + 1).lowercase()
+    return ext.ifBlank { null }
 }
 
