@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.9] - 2026-11-23 — THE FIVE-REPORT FIX PASS (prerelease)
+
+### Fixed
+
+- **Share never corrupts the file again** (user report: "some files, e.g. a
+  song, still go wrong — it changes the extension and that breaks it").
+  Three concrete defects were found and fixed in the stego result's share:
+  1. the cache copy carried a `stego_share_<timestamp>_` PREFIX — receivers
+     that derive the type from the NAME (Telegram / WhatsApp do this when
+     the intent type is generic) saw a mangled name; the copy now lives in
+     a unique subdirectory whose only file keeps the output's display name
+     EXACTLY (`song.mp3` stays `song.mp3`);
+  2. the MIME resolution went through
+     `MimeTypeMap.getFileExtensionFromUrl`, which URL-DECODES the name —
+     Persian and other non-ASCII names came out mangled, the extension was
+     lost, and the honest audio file fell back to the anonymous
+     `application/octet-stream`; the extension is now read from the LAST
+     dot of the display name verbatim;
+  3. the ACTION_SEND intent carried no name — several sharesheets take
+     the visible file name from `EXTRA_TITLE` when the provider does not
+     serve one, and some re-type the file from the name's EXTENSION; the
+     send now carries `EXTRA_TITLE` and a named ClipData.
+  The SAF embed dialog also keeps suggesting the carrier's own name (its
+  extension included) and never seeds a typed dialog that would force its
+  own extension onto the output.
+- **Visible "Saved ✓" after saving** (user report: "after it saves, show
+  something on screen so I know it saved"): the stego result card and the
+  Encrypt tab's encrypted-file card now show the SAME saved-tick line the
+  Decrypt tab shows — for 5 seconds after the SAF write, with the saved
+  name right below it.
+- **Centered avatar initial** (user report: "the initial sits off-center
+  — top-anchored, not in the middle"): the classic Compose recipe —
+  `contentAlignment(Center)` on the Box, a style whose lineHeight EQUALS
+  its fontSize, and `includeFontPadding = false` (the old
+  `wrapContentSize` respected the tall `titleMedium` line, so the glyph
+  rode high). Persian names whose first codepoint is a joiner now walk to
+  the first LETTER (a ZWNJ-first name used to render an invisible initial).
+- **Fingerprint button "sometimes doesn't come"** (user report): the
+  reveal side surfaced its unlock card WITHOUT recomputing the biometric
+  offer — a contact WITH a remembered wrap showed no fingerprint button
+  there until another screen happened to refresh it; the offer is now
+  refreshed on that path. In addition, a stale async offer computation
+  landing late (after a newer one, across a contact switch or era
+  rotation) used to overwrite the fresh reading with an older one — the
+  computation is now epoch-guarded in ToolsViewModel and dialog-contact
+  guarded in ContactsViewModel.
+- **A Done button that actually closes the keyboard** (user report:
+  "the screens with a text input still have no Done button in the UI —
+  something came on the keyboard but it doesn't work either"): a real
+  in-app **Done / تمام** button (not an IME key) now renders right under
+  every editable text field — the Encrypt and Decrypt drafts, the stego
+  message, the passphrase inputs (all unlock cards, the contact detail
+  dialog, the companion sheet, the stego cards), the add-contact form,
+  and the contact rename dialog. It uses BOTH the keyboard controller
+  and a forced focus clear — which is why the keyboard STAYS closed
+  (an IME Done key alone can leave the field focused and re-open it).
+- Sandbox recovery hardening (internal): the SDK platform jar is
+  re-downloaded on demand, and the release keystore lives inside the
+  repo tree (gitignored) so the signing identity survives a sandbox
+  recycle. The 1.6.0-beta.9 APK is signed with a FRESH release key —
+  installing over an older beta requires uninstalling it first (the
+  new key cannot sign with the old identity).
+
 ## [1.6.0-beta.8] - 2026-11-22 — THE SEVEN-REPORT POLISH PASS (prerelease)
 
 ### The decree
