@@ -448,13 +448,6 @@ fun PassphraseInput(
             ),
             modifier = Modifier.fillMaxWidth(),
         )
-        // v1.6.0-beta.9 (user report: "the screens with a text input
-        // still have no Done button in the UI that closes the keyboard"):
-        // the in-app Done button, right under the field, on EVERY
-        // passphrase surface this shared input renders (unlock cards on
-        // Encrypt / Decrypt / stego, the contact detail dialog, the
-        // companion sheets).
-        KeyboardDoneButton()
         // v0.4.0: live strength hint while the user types.
         PassphraseStrengthHint(passphrase)
         if (allowSuggestion && onCopySensitive != null) {

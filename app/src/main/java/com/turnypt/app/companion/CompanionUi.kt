@@ -429,10 +429,6 @@ private fun PassphraseField(
             ),
             modifier = Modifier.fillMaxWidth(),
         )
-        // v1.6.0-beta.9 (user report: "no Done button in the UI that
-        // closes the keyboard") — the in-app button, right under the
-        // companion sheet's passphrase field.
-        com.turnypt.app.ui.KeyboardDoneButton()
         // v0.4.0: live strength hint while the user types.
         PassphraseStrengthHint(passphrase)
         if (allowSuggestion && onCopySensitive != null) {

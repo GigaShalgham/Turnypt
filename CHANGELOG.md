@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.10] - 2026-11-24 — the Done-button scope, corrected (prerelease)
+
+### Changed
+
+- **The in-app Done button lives ONLY on the three message inputs** (user
+  clarification: "when I said finish button I meant the message input for
+  encryption/decryption and for hiding in a file"): the message drafts on
+  the Encrypt tab and the Decrypt tab, and the hidden-message field on
+  the stego screen. The v1.6.0-beta.9 pass had also added it to the
+  passphrase inputs (unlock cards, the contact detail dialog, the
+  companion sheet) and the add-contact form — that was scope the user
+  never asked for, and it is gone; those fields keep only the IME Done
+  key, exactly as before beta.9.
+
 ## [1.6.0-beta.9] - 2026-11-23 — THE FIVE-REPORT FIX PASS (prerelease)
 
 ### Fixed
