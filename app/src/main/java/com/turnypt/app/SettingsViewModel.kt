@@ -219,6 +219,13 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** v1.6.0-beta.11: the live Liquid Glass menu toggle. */
+    fun setLiquidGlassMenuEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setLiquidGlassMenuEnabled(enabled)
+        }
+    }
+
     /** v0.5.2: wipes the clipboard history from Settings. */
     fun clearClipboardHistory() {
         viewModelScope.launch {

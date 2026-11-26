@@ -129,6 +129,13 @@ data class AppSettings(
      * [CustomFileExtension.UNIFYING_EXTENSION] when enabled.
      */
     val customFileExtension: String = "",
+    /**
+     * v1.6.0-beta.11: the live Liquid Glass main menu — the page behind
+     * the bar is frosted and bent, not merely tinted. ON by default; OFF
+     * (and every device below the RenderEffect pipeline) falls back to the
+     * v1.5.10 static glass.
+     */
+    val liquidGlassMenu: Boolean = true,
 ) {
     /**
      * v1.5.2: the ONE effective custom suffix when the toggle is ON —
@@ -165,6 +172,7 @@ class SettingsRepository(
             customFileExtensionEnabled = prefs[KEY_CUSTOM_EXT_ENABLED] ?: false,
             customFileExtension = prefs[KEY_CUSTOM_EXT]?.let(CustomFileExtension::sanitize)
                 ?: "",
+            liquidGlassMenu = prefs[KEY_LIQUID_GLASS_MENU] ?: true,
         )
     }
 
@@ -204,6 +212,13 @@ class SettingsRepository(
     suspend fun setClipboardHistoryEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_CLIPBOARD_HISTORY] = enabled
+        }
+    }
+
+    /** v1.6.0-beta.11: toggles the live Liquid Glass main menu. */
+    suspend fun setLiquidGlassMenuEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_LIQUID_GLASS_MENU] = enabled
         }
     }
 
@@ -285,6 +300,7 @@ class SettingsRepository(
         private val KEY_PREFERRED_CIPHER = stringPreferencesKey("preferred_cipher")
         private val KEY_CUSTOM_EXT_ENABLED = booleanPreferencesKey("custom_file_extension_enabled")
         private val KEY_CUSTOM_EXT = stringPreferencesKey("custom_file_extension")
+        private val KEY_LIQUID_GLASS_MENU = booleanPreferencesKey("liquid_glass_menu")
 
         /** Factory for the process-wide DataStore instance. */
         fun defaultDataStore(context: Context): DataStore<Preferences> = context.turnyptDataStore

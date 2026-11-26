@@ -281,6 +281,9 @@
     <!-- v1.5.2: the setting became a PURE toggle — ON names every new
          encrypted file .tnp (the unifying suffix); the typed-suffix
          field, its error and save strings are retired. -->
+    <string name="settings_liquid_glass_title">Liquid Glass menu</string>
+    <string name="settings_liquid_glass_summary">Blurs and bends the page behind the main menu, like real glass. Turn it off if the menu ever stutters.</string>
+    <string name="settings_liquid_glass_unsupported">Live glass needs Android 12 or later and is off on low-memory devices. The menu keeps its frosted look.</string>
     <string name="settings_custom_ext_title">Custom file extension</string>
     <string name="settings_custom_ext_summary">Off (default): Turnypt\'s own suffixes — .tnpi for encrypted images, .cki for everything else. On: every newly encrypted file — image or not — gets the single .tnp suffix. Only the name changes: decryption never depends on it, so files with any suffix keep opening.</string>
     <string name="settings_clipboard_history_title">Clipboard history</string>

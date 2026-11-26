@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -17,6 +19,7 @@ import com.turnypt.app.clipboard.ClipboardHistoryRecorder
 import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.ui.TurnyptApp
 import com.turnypt.app.ui.theme.TurnyptTheme
+import com.turnypt.data.preferences.AppSettings
 import com.turnypt.data.preferences.SettingsRepository
 import android.provider.Settings as AndroidSettings
 
@@ -58,11 +61,13 @@ class MainActivity : FragmentActivity() {
             WindowManager.LayoutParams.FLAG_SECURE,
         )
         setContent {
+            val settings by settingsRepository.settings.collectAsState(initial = AppSettings())
             androidx.compose.runtime.CompositionLocalProvider(
                 LocalBiometrics provides biometrics,
             ) {
                 TurnyptTheme {
-                    TurnyptApp()
+                    // v1.6.0-beta.11: Settings > Features > "Liquid Glass menu".
+                    TurnyptApp(liquidGlassMenu = settings.liquidGlassMenu)
                 }
             }
         }

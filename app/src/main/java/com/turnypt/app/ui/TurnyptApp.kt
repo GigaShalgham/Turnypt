@@ -9,9 +9,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,13 +37,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavArgument
@@ -61,9 +67,19 @@ import com.turnypt.app.ToolsViewModel
 import com.turnypt.app.companion.DestinationRoute
 import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.ui.theme.GlassRadii
+import com.turnypt.app.ui.theme.LiquidGlass
+import com.turnypt.app.ui.theme.LiquidGlassColors
+import com.turnypt.app.ui.theme.LiquidGlassState
 import com.turnypt.app.ui.theme.LocalGlassTokens
 import com.turnypt.app.ui.theme.glassBackdrop
-import com.turnypt.app.ui.theme.glassSurface
+import com.turnypt.app.ui.theme.liquidGlassBackdrop
+import com.turnypt.app.ui.theme.liquidGlassColors
+import com.turnypt.app.ui.theme.liquidGlassRim
+import com.turnypt.app.ui.theme.liquidGlassSource
+import com.turnypt.app.ui.theme.liquidGlassSurface
+import com.turnypt.app.ui.theme.liquidLens
+import com.turnypt.app.ui.theme.liquidLensShadow
+import com.turnypt.app.ui.theme.rememberLiquidGlassState
 
 /**
  * Six-tab main navigation: Home, Encrypt, Decrypt, Advanced encryption
@@ -95,10 +111,13 @@ private val NavDestinations = listOf(
 )
 
 @Composable
-fun TurnyptApp() {
+fun TurnyptApp(liquidGlassMenu: Boolean = true) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val glass = LocalGlassTokens.current
+    // v1.6.0-beta.11: the live material and its light (see LiquidGlass.kt).
+    val liquid = rememberLiquidGlassState(enabled = liquidGlassMenu)
+    val liquidColors = liquidGlassColors()
 
     // v1.5.7 perf: the destination table is a compile-time constant —
     // it was rebuilt (five data class allocations + the list) on every
@@ -116,6 +135,16 @@ fun TurnyptApp() {
             .fillMaxSize()
             .glassBackdrop(glass),
     ) {
+        // v1.6.0-beta.11: ONLY the content area feeds the glass. The bar
+        // below is a sibling, outside the recording, so the pane can never
+        // see itself; on the static tier this wrapper is a plain Box.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (liquid.live) Modifier.liquidGlassSource(liquid) else Modifier,
+                ),
+        ) {
         NavHost(
             navController = navController,
             startDestination = DestinationRoute.HOME,
@@ -280,6 +309,7 @@ fun TurnyptApp() {
                 )
             }
         }
+        }
 
         // The floating glass navigation bar, pinned above the content.
         // v1.5.0 (user brief §5): respect the system navigation bar's
@@ -313,6 +343,8 @@ fun TurnyptApp() {
                     backStackEntry?.destination?.hierarchy
                         ?.any { it.route?.substringBefore('?') == destination.route } == true
                 },
+                liquid = liquid,
+                colors = liquidColors,
                 onSelect = { destination ->
                     val currentBase =
                         backStackEntry?.destination?.route?.substringBefore('?')
@@ -344,108 +376,142 @@ fun TurnyptApp() {
 }
 
 /**
- * The floating Liquid Glass navigation bar: one glass pill, five slots,
- * and a selection pill that SPRINGS between slots (overshoot tuned small
- * so labels never clip). Each slot is a ≥48dp target with a visible
- * label — icon + label, never icon alone.
+ * The floating Liquid Glass navigation bar (v1.6.0-beta.11).
+ *
+ * One glass pill, six slots and a selection LENS that springs between
+ * them. On the live tiers the pill is three layers, cheapest outside in:
+ *
+ *  1. the elevation shadow — the OUTERMOST modifier, because it draws
+ *     outside the clip (a shadow clipped to its own shape vanishes) and,
+ *     with clip = true, clips everything inside back to the pill, the
+ *     oversized backdrop pane included;
+ *  2. the backdrop pane: the page recording, frosted and bent
+ *     ([liquidGlassBackdrop]);
+ *  3. the pane's own light — tint, sheen, rim ([liquidGlassSurface],
+ *     [liquidGlassRim]) — with the lens and the slots over it.
+ *
+ * Every animated value is read ONLY inside graphicsLayer / drawBehind
+ * lambdas (deferred state reads): a running animation repaints a layer,
+ * it never recomposes the slots. Routes, selection and retap behaviour
+ * live in [TurnyptApp] and are untouched.
  */
 @Composable
 private fun FloatingGlassNavBar(
     destinations: List<Destination>,
     selectedRoute: (Destination) -> Boolean,
     onSelect: (Destination) -> Unit,
+    liquid: LiquidGlassState,
+    colors: LiquidGlassColors,
 ) {
     val glass = LocalGlassTokens.current
-    // v1.5.7 perf: one pill shape, allocated once per bar composition
-    // instead of per slot row pass.
+    // v1.5.7 perf: one pill shape, allocated once per bar composition.
     val barShape = GlassRadii.pillShape
+    val live = liquid.live
     val selectedIndex = destinations.indexOfFirst { selectedRoute(it) }
         .coerceAtLeast(0)
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
-    // The selection pill slides between the five slots; fraction in
-    // [0, 4]. v1.5.0 (user brief §4): critically damped (NO overshoot —
-    // no bounce), high stiffness — the pill lands immediately and the
-    // motion stays cheap. The animated value is read ONLY inside the
-    // offset/graphicsLayer lambdas (deferred state reads): a running
-    // animation repaints the layer, it never recomposes the slots.
-    //
-    // v1.5.7 (user report: "the bottom navigation animation is too fast,
-    // making transitions feel jumpy rather than smooth"): the spring
-    // ran at the LIBRARY DEFAULT stiffness (10_000) — a ~120ms snap
-    // that finished while the page beneath it was still mid-fade, so
-    // the pill teleported and the page caught up: two motions at two
-    // speeds, the textbook recipe for "jumpy". The pill is now tuned to
-    // the same beat as the page transition it accompanies: stiffness
-    // 380 with critical damping settles in ~280ms — it ARRIVES with the
-    // incoming screen instead of racing it, still with zero overshoot
-    // (labels never clip) and the same deferred-read structure (each
-    // frame is one layer translate; the five slots never recompose).
+    // The selection lens slides between the slots (fraction in [0, 5]).
+    // The same ~280ms beat as the page transition, with a breath of
+    // overshoot: a liquid lens may wobble a hair past its slot — it
+    // carries no label, so nothing can clip.
     val selectionFraction = animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = 380f,
+            dampingRatio = 0.8f,
+            stiffness = 420f,
             visibilityThreshold = 0.01f,
         ),
         label = "navSelection",
     )
 
-    // v1.4.1 bugfix: the Row of slots is the size-defining child (a real
-    // measured height), and the sliding pill sits in a matchParentSize
-    // wrapper BEHIND it. In v1.4.0 every child was matchParentSize — such
-    // children are excluded from the parent's size resolution, so the bar
-    // resolved to ZERO height and the whole navigation was invisible.
-    BoxWithConstraints(
+    // v1.4.1 (kept): the slot Row is the size-defining child. The pane and
+    // the lens are matchParentSize wrappers, which a Box leaves out of its
+    // own size resolution — with ONLY such children the bar was 0dp tall.
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassSurface(glass, barShape, tint = glass.navTint)
-            .padding(6.dp),
+            .shadow(
+                elevation = 8.dp,
+                shape = barShape,
+                clip = true,
+                ambientColor = glass.shadowColor,
+                spotColor = glass.shadowColor,
+            ),
     ) {
-        val slotWidth = maxWidth / destinations.size
-        // The sliding selection pill under the active slot's content.
-        // v1.5.0 perf: the offset reads the animation INSIDE the lambda
-        // (deferred read) — each frame is a layer translate only; the
-        // five slots never recompose while the pill glides.
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .offset {
-                    IntOffset(
-                        x = (slotWidth.toPx() * selectionFraction.value).roundToInt(),
-                        y = 0,
-                    )
-                },
-        ) {
+        if (live) {
             Box(
                 modifier = Modifier
-                    .width(slotWidth)
-                    .fillMaxHeight()
-                    .background(
-                        MaterialTheme.colorScheme.primaryContainer,
-                        barShape,
-                    ),
+                    .matchParentSize()
+                    .liquidGlassBackdrop(liquid, colors, glass.backdropTop),
             )
         }
-        Row {
-            destinations.forEach { destination ->
-                val selected = selectedRoute(destination)
-                NavBarSlot(
-                    destination = destination,
-                    selected = selected,
-                    onClick = { onSelect(destination) },
-                    modifier = Modifier.weight(1f),
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .liquidGlassSurface(colors, live, glass.navTint)
+                .liquidGlassRim(colors, live, glass.border)
+                .padding(6.dp),
+        ) {
+            val slotWidth = maxWidth / destinations.size
+
+            // The selection lens under the active slot: one layer translate
+            // per frame. translationX is NOT mirrored in RTL, so the sign is.
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        translationX =
+                            (if (rtl) -1f else 1f) * slotWidth.toPx() * selectionFraction.value
+                    },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(slotWidth)
+                        .fillMaxHeight()
+                        .padding(horizontal = 4.dp, vertical = 5.dp)
+                        .graphicsLayer {
+                            // Liquid: the lens stretches along its flight and
+                            // gives the height back, so it holds its volume.
+                            val stretch = if (live) {
+                                LiquidGlass.lensStretch(selectedIndex - selectionFraction.value)
+                            } else {
+                                1f
+                            }
+                            scaleX = stretch
+                            scaleY = LiquidGlass.lensSquash(stretch)
+                        }
+                        .then(if (live) Modifier.liquidLensShadow(colors) else Modifier)
+                        .clip(barShape)
+                        .liquidLens(colors, live, MaterialTheme.colorScheme.primaryContainer),
                 )
+            }
+
+            Row {
+                destinations.forEach { destination ->
+                    val selected = selectedRoute(destination)
+                    NavBarSlot(
+                        destination = destination,
+                        selected = selected,
+                        onClick = { onSelect(destination) },
+                        liquid = liquid,
+                        colors = colors,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
 }
 
-/** One nav slot: icon + label, tinted by selection state. */
+/** One nav slot: icon + label, tinted by selection state, with a liquid press. */
 @Composable
 private fun NavBarSlot(
     destination: Destination,
     selected: Boolean,
     onClick: () -> Unit,
+    liquid: LiquidGlassState,
+    colors: LiquidGlassColors,
     modifier: Modifier = Modifier,
 ) {
     val fg = if (selected) {
@@ -453,25 +519,20 @@ private fun NavBarSlot(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    // The active icon settles a hair larger — quiet emphasis. v1.5.0 perf:
-    // no-bouncy spring, and the scale is read only inside the
-    // graphicsLayer lambda — the animation never recomposes the slot.
-    // v1.5.2 (user report: "the app feels static — add animation
-    // everywhere"): the spring now carries a LITTLE life —
-    // MediumBouncy, not NoBouncy — a single soft settle, still quiet,
-    // still cheap (same deferred-read structure). The selected color
-    // also cross-fades so the tint change reads as motion, not a blink.
-    //
-    // v1.5.7 (user report: "jumpy rather than smooth"): this spring ran
-    // at StiffnessMediumLow — a ~500ms+ settle with its bounce landing
-    // a quarter-second AFTER the page transition had already finished,
-    // a tail of motion on a settled screen (and five slots re-arming
-    // their animators on every selection change). The settle is re-tuned
-    // to the shared ~280ms beat: same MediumBouncy character (the one
-    // soft overshoot stays — it is the deliberate life of v1.5.2),
-    // stiffness raised to 1200 so it finishes WITH the pill's arrival
-    // instead of dragging on after it. The alpha cross-fade follows the
-    // same clock (280ms FastOutSlowIn, matching the page fade).
+    // v1.6.0-beta.11: the press is a liquid nudge — the slot sinks a hair
+    // into the glass and a soft bloom spreads under its icon. Both are read
+    // only in the draw phase, so a press never recomposes the slot.
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val press = animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(durationMillis = 120),
+        label = "navPress",
+    )
+    // The active icon settles a hair larger (MediumBouncy, 1200: the one
+    // soft overshoot is the deliberate life of v1.5.2, finishing on the
+    // page's ~280ms beat per v1.5.7); the colour cross-fades on the same
+    // clock. Scale and alpha are read only inside the graphicsLayer lambda.
     val iconScale = animateFloatAsState(
         targetValue = if (selected) 1.12f else 1f,
         animationSpec = spring(
@@ -495,10 +556,30 @@ private fun NavBarSlot(
         modifier = modifier
             .heightIn(min = 48.dp)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick,
             )
+            .graphicsLayer {
+                val scale = 1f - 0.06f * press.value
+                scaleX = scale
+                scaleY = scale
+            }
+            .drawBehind {
+                if (liquid.live && press.value > 0.01f) {
+                    // the icon's centre: 8dp top padding + half of 22dp
+                    val centre = Offset(size.width / 2f, 19.dp.toPx())
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            0f to colors.bloom.copy(alpha = colors.bloom.alpha * press.value),
+                            1f to Color.Transparent,
+                            center = centre,
+                        ),
+                        radius = 23.dp.toPx(),
+                        center = centre,
+                    )
+                }
+            }
             .padding(top = 8.dp, bottom = 6.dp),
     ) {
         Icon(

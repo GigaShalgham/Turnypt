@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.11] - 2026-11-26 — the main menu becomes real Liquid Glass (prerelease)
+
+The user request: "make the main menu in liquid glass design". The v1.5.10
+glass was a tint, a rim and a shadow — nothing of what lies behind a pane
+survived it. This release adds the missing half: the page itself, frosted
+and bent, seen through the bar.
+
+### Added
+
+- **Liquid Glass main menu** — the content area is captured into one
+  GraphicsLayer and the pane behind the pill re-draws that recording
+  through blur → vibrancy; on Android 13+ an AGSL lens shader ends the
+  chain, bending the page outward in a 24dp rim band (depth 18dp, 5%
+  magnification, faint dispersion, rim shading) so content wraps around
+  the pill's edge the way a thick glass lens refracts what is under it.
+  The tint thins toward the rim — right where the lens works — and is
+  densest behind the labels, where the contrast is needed.
+- **Selection lens** — the primary-container pill becomes a raised glass
+  droplet: top-lit gradient, specular streak, hairline rim, its own soft
+  shadow, and it stretches along its flight and gives the height back so
+  it holds its volume (the ~280ms selection beat of v1.5.7 is kept).
+- **Liquid press** — a pressed slot sinks a hair into the glass with a
+  soft bloom under its icon; both are read only in the draw phase, so a
+  press never recomposes the slots.
+- **Settings › Features › "Liquid Glass menu"** (منوی شیشه‌ای مایع) — on
+  by default, with the summary "turn it off if the menu ever stutters".
+  Greyed out with an honest explanation below Android 12 and on
+  low-memory devices, where the menu keeps the static v1.5.10 glass.
+- **Per-device tiers** — full material (frost + lens) on Android 13+,
+  frost-only on Android 12, static glass below that. Chosen automatically.
+
+### Fixed
+
+- **Root cause of the v1.6.0-alpha.5 lag** (reported as "the cost of
+  blur, the look of nothing"): that build called the
+  `GraphicsLayer.record(density, …)` overload, which does NOT retarget
+  the canvas — the page was painted to the screen twice every frame while
+  the layer meant to be blurred stayed empty. The DrawScope
+  `record { drawContent() }` extension used here does retarget it: the
+  page is rasterised once, only a pane-sized clipped copy goes through
+  the blur, and an idle screen costs exactly what it did before.
+
 ## [1.6.0-beta.10] - 2026-11-24 — the Done-button scope, corrected (prerelease)
 
 ### Changed

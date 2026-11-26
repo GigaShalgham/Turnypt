@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.turnypt.app.ui.theme.rememberLiquidGlassSupported
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -77,6 +78,8 @@ fun SettingsScreen(
     val biometricGate by viewModel.biometricGate.collectAsStateWithLifecycle()
     val overlayGranted by viewModel.overlayGranted.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // v1.6.0-beta.11: honest switch — greyed out where the device cannot render it.
+    val liquidGlassSupported = rememberLiquidGlassSupported()
 
     // Deep-scan F2: refresh on every resume — returning from the system
     // overlay-permission screen with the toggle on must start the service.
@@ -203,6 +206,21 @@ fun SettingsScreen(
                 checked = settings.customFileExtensionEnabled,
                 enabled = true,
                 onCheckedChange = viewModel::setCustomFileExtensionEnabled,
+            )
+
+            // ------------------------------------------ liquid glass menu (v1.6.0-beta.11)
+            SettingSwitchRow(
+                title = stringResource(R.string.settings_liquid_glass_title),
+                subtitle = stringResource(
+                    if (liquidGlassSupported) {
+                        R.string.settings_liquid_glass_summary
+                    } else {
+                        R.string.settings_liquid_glass_unsupported
+                    },
+                ),
+                checked = settings.liquidGlassMenu,
+                enabled = liquidGlassSupported,
+                onCheckedChange = viewModel::setLiquidGlassMenuEnabled,
             )
         }
 
