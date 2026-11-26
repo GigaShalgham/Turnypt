@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.12] - 2026-11-26 — the device-bug fix pass (prerelease)
+
+The user report: "now it is very close to liquid glass but it has many
+bug's you should debug it". The bugs were invisible in the desktop preview
+and obvious on a phone — the root cause is a single Android platform fact:
+**the hardware-accelerated canvas never renders `Paint.setMaskFilter()`**
+(it is marked "✗" in the official hardware-acceleration support table).
+beta.11's live glass used `BlurMaskFilter` in two places; the desktop Skia
+preview renders in software, where mask filters work, which is exactly why
+the previews looked right while the device did not.
+
+### Fixed
+
+- **The tint's soft inner ramp was a HARD square-edged rectangle** — the
+  blurred inner pill that tops the tint up to full centre strength was
+  smeared with a `BlurMaskFilter`, so the GPU pipeline silently dropped the
+  blur and painted the raw pill outline inside the glass. The ramp is now
+  drawn by `Modifier.liquidTintRamp` with ordinary rounded-rect gradients
+  (a vertical body gradient plus a hairline ring that keeps the wash
+  continuous) — GPU-safe everywhere, same measured tint weight (worst
+  unselected label contrast 4.54:1 light / 4.58:1 dark, both WCAG AA).
+- **The selection lens's drop shadow was a HARD dark rectangle** chasing
+  the lens as it travels between slots (same dropped-blur cause, at its
+  most visible mid-flight). `liquidLensShadow` is now a vertical-gradient
+  wash (alpha 0.35 → 0.85 → 0) centred under the lens — an ordinary
+  brush, GPU-safe.
+- The desktop measure harness (`scripts/lg_preview.py`) now renders the
+  same gradient ramp and shadow the app draws, so preview and device can
+  no longer disagree on these two paths.
+
 ## [1.6.0-beta.11] - 2026-11-26 — the main menu becomes real Liquid Glass (prerelease)
 
 The user request: "make the main menu in liquid glass design". The v1.5.10
