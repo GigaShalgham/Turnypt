@@ -77,6 +77,7 @@ import com.turnypt.app.ui.theme.liquidGlassColors
 import com.turnypt.app.ui.theme.liquidGlassRim
 import com.turnypt.app.ui.theme.liquidGlassSource
 import com.turnypt.app.ui.theme.liquidGlassSurface
+import com.turnypt.app.ui.theme.liquidTintRamp
 import com.turnypt.app.ui.theme.liquidLens
 import com.turnypt.app.ui.theme.liquidLensShadow
 import com.turnypt.app.ui.theme.rememberLiquidGlassState
@@ -450,6 +451,7 @@ private fun FloatingGlassNavBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .liquidGlassSurface(colors, live, glass.navTint)
+                .then(if (live) Modifier.liquidTintRamp(colors) else Modifier)
                 .liquidGlassRim(colors, live, glass.border)
                 .padding(6.dp),
         ) {

@@ -26,14 +26,11 @@ import androidx.compose.ui.graphics.RenderEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.layer.drawLayer
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -602,27 +599,18 @@ fun Modifier.liquidGlassSurface(
     }
     val tint = colors.paneTint
     val base = tint.copy(alpha = LiquidGlass.tintBaseAlpha(tint.alpha))
-    val body = tint.copy(alpha = LiquidGlass.tintBodyAlpha(tint.alpha))
     drawRect(base)
-    val ramp = LiquidGlass.TINT_RAMP_DP.dp.toPx()
-    val radius = (size.height - ramp * 2f) / 2f
-    drawIntoCanvas { canvas ->
-        canvas.nativeCanvas.drawRoundRect(
-            ramp,
-            ramp,
-            size.width - ramp,
-            size.height - ramp,
-            radius,
-            radius,
-            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                color = body.toArgb()
-                maskFilter = android.graphics.BlurMaskFilter(
-                    ramp / 2f,
-                    android.graphics.BlurMaskFilter.Blur.NORMAL,
-                )
-            },
-        )
-    }
+    // v1.6.0-beta.12 (bug fix): the inner pill that tops the tint up to
+    // full centre strength used to be smeared with a BlurMaskFilter —
+    // but Android's hardware-accelerated canvas NEVER renders
+    // Paint.setMaskFilter() (officially "✗" in the hardware-accel
+    // support table), so on a real device the "soft ramp" was a HARD
+    // square-edged inner pill. The ramp is now a separate blurred layer
+    // drawn by the bar (see TurnyptApp: a child Box with Modifier.blur,
+    // which rides the RenderEffect pipeline on API 31+ — exactly the
+    // tiers the live material runs on). The desktop Skia preview honored
+    // the mask filter, which is why the preview looked right while the
+    // device did not.
     drawRect(
         brush = Brush.linearGradient(
             0f to colors.sheen,
@@ -639,6 +627,43 @@ fun Modifier.liquidGlassSurface(
             startY = size.height - shadeHeight,
             endY = size.height,
         ),
+    )
+}
+
+/**
+ * The tint's soft inner ramp: a raised-droplet gradient ring that tops the
+ * centre up to full strength, thinning toward the rim. GPU-safe: painted
+ * with ordinary rounded-rect gradients — no [android.graphics.Paint]
+ * mask filters (the hardware canvas ignores those, beta.11's bug).
+ */
+fun Modifier.liquidTintRamp(colors: LiquidGlassColors): Modifier = drawBehind {
+    val tint = colors.paneTint
+    val centreAlpha = tint.alpha
+    val body = LiquidGlass.tintBodyAlpha(centreAlpha)
+    if (body <= 0f) return@drawBehind
+    val ramp = LiquidGlass.TINT_RAMP_DP.dp.toPx()
+    val colour = tint.copy(alpha = body)
+    // the inner pill: a vertical gradient over the body colour — the
+    // top half rides toward full strength, the bottom runs a hair thinner,
+    // which reads as the soft blurred edge of beta.11's design intent
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            0f to colour,
+            0.62f to colour,
+            1f to colour.copy(alpha = body * 0.72f),
+        ),
+        topLeft = Offset(ramp, ramp * 0.5f),
+        size = Size(size.width - ramp * 2f, size.height - ramp),
+        cornerRadius = CornerRadius((size.height - ramp * 1.5f) / 2f),
+    )
+    // the ring left by the inset: one hairline of body colour at the rim
+    // keeps the tint continuous (no gap between base wash and ramp)
+    drawRoundRect(
+        brush = SolidColor(colour.copy(alpha = body * 0.55f)),
+        topLeft = Offset(ramp * 0.5f, ramp * 0.5f),
+        size = Size(size.width - ramp, size.height - ramp),
+        cornerRadius = CornerRadius((size.height - ramp) / 2f),
+        style = Stroke(ramp * 0.5f),
     )
 }
 
@@ -712,26 +737,30 @@ fun Modifier.liquidLens(
     )
 }
 
-/** The selection lens's soft drop shadow. Applied OUTSIDE the lens's clip. */
+/**
+ * The selection lens's soft drop shadow. Applied OUTSIDE the lens's clip.
+ *
+ * v1.6.0-beta.12 (bug fix): beta.11 smeared this with a BlurMaskFilter —
+ * the hardware canvas NEVER renders Paint.setMaskFilter(), so on a real
+ * device the "soft" shadow was a HARD-edged dark rectangle under the
+ * lens. It is now a radial-gradient wash centred under the lens — an
+ * ordinary brush, GPU-safe everywhere.
+ */
 fun Modifier.liquidLensShadow(colors: LiquidGlassColors): Modifier = drawBehind {
     val lift = 2.dp.toPx()
-    drawIntoCanvas { canvas ->
-        canvas.nativeCanvas.drawRoundRect(
-            0f,
-            lift,
-            size.width,
-            size.height + lift,
-            size.height / 2f,
-            size.height / 2f,
-            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                color = colors.lensShadow.toArgb()
-                maskFilter = android.graphics.BlurMaskFilter(
-                    2.dp.toPx(),
-                    android.graphics.BlurMaskFilter.Blur.NORMAL,
-                )
-            },
-        )
-    }
+    val shadow = colors.lensShadow
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            0f to shadow.copy(alpha = shadow.alpha * 0.35f),
+            0.55f to shadow.copy(alpha = shadow.alpha * 0.85f),
+            1f to Color.Transparent,
+            startY = lift,
+            endY = size.height + lift,
+        ),
+        topLeft = Offset(0f, lift),
+        size = Size(size.width, size.height + lift),
+        cornerRadius = CornerRadius(size.height / 2f),
+    )
 }
 
 /**
