@@ -2,7 +2,6 @@ package com.turnypt.app.ui.theme
 
 import android.app.ActivityManager
 import android.content.Context
-import android.graphics.Bitmap
 import android.os.Build
 import android.view.View
 import androidx.annotation.RequiresApi
@@ -39,7 +38,7 @@ import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -53,14 +52,18 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
 
 /**
  * v1.6.0-beta.13: the Liquid Glass MATERIAL — one engine behind every glass
- * surface in the app, not only the main menu.
+ * surface in the app, not only the main menu. v1.6.0-beta.14 rebuilt its lens
+ * ([LIQUID_LENS_SKSL]) after the device reports on beta.13.
  *
  * A pane of this glass is a COPY of what lies behind it, frosted and bent:
  *
@@ -68,16 +71,32 @@ import kotlin.math.min
  *     The FIELD is the quiet static light the whole window sits on (recorded
  *     once per size, [Modifier.liquidGlassField]); the PAGE is the live
  *     content area (recorded on every draw, [Modifier.liquidGlassSource]).
- *     A surface never samples a layer that contains itself: cards and wells
- *     read the field, the bar reads the page, the FAB reads the list — each
- *     from OUTSIDE the recorded tree.
+ *     A surface never samples a layer that contains itself: the bar reads
+ *     the page, the FAB reads the list — each from OUTSIDE the recorded
+ *     tree.
  *  2. PANES. [Modifier.liquidGlassPane] gives any uniform-corner shape its
  *     own small layer: a copy of the sources shifted to line up with the
- *     real pixels, grown by a margin of real content so the blur never
- *     samples its own clamped edge, run through a RenderEffect chain —
- *     blur -> vibrancy -> (Android 13+) the refraction lens
- *     ([LIQUID_LENS_SKSL]) — and clipped to the shape. Card panes render at
- *     half resolution where the density allows it (a quarter of the pixels).
+ *     real pixels, CLIPPED to the pane's own outline and grown by a margin
+ *     that stays empty. The layer never holds a pixel of the page from
+ *     beyond a rim: a blur mixes what lies around a pixel, and as long as
+ *     the margin carried the real page the frost smeared whatever lies
+ *     beyond a rim into the rim band (v1.6.0-beta.13 slid its sample there
+ *     on purpose; beta.14's first cut removed the slide and the harness
+ *     still found the strip under the bar inside the bar's bottom edge,
+ *     ~32px deep). What the blur is missing at a rim — the half of its
+ *     kernel that lies outside — is the pane's own mirror image: the lens
+ *     shader completes every sample with its reflection across the nearest
+ *     rim point, which is exact on a straight edge and near enough on a
+ *     corner; the frost-only tier has no shader, and there the copy fades
+ *     into the field's base colour over the last blur width. The layer then
+ *     runs through a RenderEffect chain: blur -> (Android 13+) the lens
+ *     shader, which carries the vibrancy and the bend. On 11–12 the bend
+ *     does not exist and the vibrancy is a colour filter. Cards are no
+ *     longer panes: what a card
+ *     "sampled" was the smooth field it sits on, so blur and lens changed
+ *     nothing a pixel could show, while twelve of them cost more frame time
+ *     than the menu itself. A card is now its tint, the liquid light and the
+ *     rim, drawn over the real field (see [Modifier.glassSurface]).
  *  3. LIGHT. Over the pane: one flat tint wash and full-width gradients
  *     (sheen, contact shade), then the rim. Nothing soft is ever a hard-edged
  *     shape: beta.11's BlurMaskFilter is not rendered by the hardware canvas
@@ -105,15 +124,23 @@ enum class LiquidGlassTier {
 /**
  * What a pane is for. The numbers are dp (or unitless) and are turned into
  * pixels by [LiquidGlass.profile].
+ *
+ * The lens numbers obey one rule, checked by the unit tests for every kind:
+ * the bevel is fold-free when [depthDp] is below two thirds of [bandDp]
+ * ([LiquidGlass.FOLD_FREE_RATIO]).
  */
 enum class LiquidGlassKind(
     /** Android's blur radius. The selection lens is clearer than the bar it sits on. */
     val blurDp: Float,
-    /** Width of the refraction band, inward from the rim. */
+    /** Width of the bevel band, inward from the rim. */
     val bandDp: Float,
-    /** How far the rim samples OUTSIDE the pane at its very edge. */
+    /**
+     * How far the rim pulls its sample INWARD, at the very edge: the depth
+     * of the glass. A pixel on the rim shows the page this far inside the
+     * rim — never anything from beyond it.
+     */
     val depthDp: Float,
-    /** Magnification about the pane's centre. */
+    /** Magnification about the pane's centre (1: the pane is flat in the middle). */
     val magnify: Float,
     /** Share of the scheme's rim light, rim shade and dispersion. */
     val lightShare: Float,
@@ -121,58 +148,44 @@ enum class LiquidGlassKind(
     val dispersionShare: Float,
     /** The inner specular ring on the lit side of the rim: (dark) -> 0..1. */
     val specular: (dark: Boolean) -> Float,
-    /** Half-resolution panes where the density allows (cards: the blur hides it). */
-    val halfResolution: Boolean,
 ) {
-    /** The floating navigation bar: the hero of the material. */
+    /**
+     * The floating navigation bar: the hero of the material. A wide pill is
+     * flat in the middle (its content must not slide about) and bends only
+     * in the 10dp nearest its rim.
+     */
     BAR(
-        blurDp = 14f, bandDp = 24f, depthDp = 18f, magnify = 1.05f,
+        blurDp = 11f, bandDp = 10f, depthDp = 5f, magnify = 1f,
         lightShare = 1f, shadeShare = 1f, dispersionShare = 1f,
-        specular = { dark -> if (dark) 0.34f else 0.22f },
-        halfResolution = false,
+        specular = { dark -> if (dark) 0.55f else 0.40f },
     ),
 
-    /** The travelling selection lens: a clearer droplet of the same glass. */
+    /** The travelling selection lens: a clearer, magnifying droplet of the same glass. */
     LENS(
-        blurDp = 6f, bandDp = 14f, depthDp = 22f, magnify = 1.12f,
-        lightShare = 1.4f, shadeShare = 1.25f, dispersionShare = 1.4f,
-        specular = { dark -> if (dark) 0.6f else 0.45f },
-        halfResolution = false,
+        blurDp = 7f, bandDp = 6f, depthDp = 1f, magnify = 1.10f,
+        lightShare = 1.4f, shadeShare = 1.2f, dispersionShare = 1.4f,
+        specular = { dark -> if (dark) 0.80f else 0.65f },
     ),
 
-    /** Cards, chips, fields, plates — everything that sits on the field. */
-    CARD(
-        blurDp = 10f, bandDp = 18f, depthDp = 7f, magnify = 1.012f,
-        lightShare = 0.7f, shadeShare = 0.6f, dispersionShare = 0.4f,
-        specular = { dark -> if (dark) 0.28f else 0.16f },
-        halfResolution = true,
-    ),
-
-    /** The floating action button: a small round lens over the list. */
+    /** The floating action button: a small lens over the list. */
     FAB(
-        blurDp = 10f, bandDp = 16f, depthDp = 18f, magnify = 1.08f,
-        lightShare = 1.2f, shadeShare = 1f, dispersionShare = 1f,
-        specular = { dark -> if (dark) 0.5f else 0.3f },
-        halfResolution = false,
+        blurDp = 8f, bandDp = 6f, depthDp = 3f, magnify = 1f,
+        lightShare = 1.2f, shadeShare = 1.1f, dispersionShare = 1f,
+        specular = { dark -> if (dark) 0.70f else 0.55f },
     ),
 }
 
 /** The pure numbers behind the glass — no Android types, fully unit-tested. */
 object LiquidGlass {
-    /** Android's blur "radius". HWUI turns it into sigma = 0.57735·r + 0.5 px. */
-    const val BLUR_RADIUS_DP = 14f
-
     /** Vibrancy: the backdrop's saturation is lifted this much under the glass. */
     const val SATURATION = 1.3f
 
-    /** Width of the refraction band, measured inward from the pill's rim. */
-    const val LENS_BAND_DP = 24f
-
-    /** How far the rim samples OUTSIDE the pill at the very edge (the bend). */
-    const val LENS_DEPTH_DP = 18f
-
-    /** The pane is a lens, so its centre magnifies the backdrop a little. */
-    const val LENS_MAGNIFY = 1.05f
+    /**
+     * A bevel folds (mirrors a strip of the page, the way a badly cut lens
+     * does) once its depth reaches two thirds of its band; the shipped kinds
+     * stay below it and the unit test holds them there.
+     */
+    const val FOLD_FREE_RATIO = 2f / 3f
 
     /** How far the travelling selection lens stretches at full speed. */
     const val LENS_STRETCH = 0.26f
@@ -186,14 +199,14 @@ object LiquidGlass {
     /** A jump of this many slots (or more) stretches by the full [LENS_STRETCH]. */
     const val STRETCH_FULL_DISTANCE_SLOTS = 1.5f
 
-    /** Blur radii kept as REAL content on every side of a pane (three sigmas). */
+    /**
+     * How far the frost's fade reaches past a rim, in blur sigmas. A pane's
+     * effect layer keeps this much room so the fade is never clamped.
+     */
     const val BLUR_SIGMA_MARGIN = 3f
 
-    /** A little air past the blur and the lens reach, in dp. */
+    /** A little air past the blur, in dp. */
     const val MARGIN_AIR_DP = 4f
-
-    /** From this density up, half-resolution panes are indistinguishable from full ones. */
-    const val HALF_RES_MIN_DENSITY = 2.5f
 
     /** AOSP `Blur::convertRadiusToSigma` — what `createBlurEffect(radius)` blurs by. */
     private const val BLUR_SIGMA_SCALE = 0.57735f
@@ -201,12 +214,12 @@ object LiquidGlass {
     // The lens light by scheme, as plain floats so [profile] stays testable
     // without Compose. [LightLiquidGlass] / [DarkLiquidGlass] carry the same
     // numbers as colours.
-    const val LIGHT_RIM_LIGHT = 0f
-    const val LIGHT_RIM_SHADE = 0.10f
+    const val LIGHT_RIM_LIGHT = 0.30f
+    const val LIGHT_RIM_SHADE = 0.26f
     const val LIGHT_DISPERSION = 0.05f
-    const val DARK_RIM_LIGHT = 0.34f
-    const val DARK_RIM_SHADE = 0.45f
-    const val DARK_DISPERSION = 0.06f
+    const val DARK_RIM_LIGHT = 0.42f
+    const val DARK_RIM_SHADE = 0.50f
+    const val DARK_DISPERSION = 0.07f
 
     /**
      * The tier a device renders at. Live glass needs the RenderEffect
@@ -224,36 +237,33 @@ object LiquidGlass {
         if (radiusPx <= 0f) 0f else BLUR_SIGMA_SCALE * radiusPx + 0.5f
 
     /**
-     * How much real content a pane needs around itself on every side, in
-     * pixels: enough that the pane samples only un-clamped blur ([radiusPx]),
-     * plus the lens's outward reach ([lensDepthPx]) and a little air
-     * ([extraPx]).
+     * How much room a pane's effect layer leaves around itself on every
+     * side, in pixels: the blur ([radiusPx] is Android's blur radius) spreads
+     * the pane's own copy that far outward, and the lens reads that spread —
+     * it completes a sample near a rim with the blurred value just OUTSIDE
+     * the rim, so the layer has to hold the whole fade instead of clamping
+     * it at the rim (a clamped layer would answer with the rim itself).
+     * Plus a little air ([extraPx]). Nothing but that fade is ever there:
+     * the lens samples inside the pane, and past a rim the layer holds
+     * nothing of the page.
      */
-    fun backdropMarginPx(radiusPx: Float, lensDepthPx: Float, extraPx: Float): Float =
-        BLUR_SIGMA_MARGIN * blurSigmaPx(radiusPx) + lensDepthPx + extraPx
+    fun backdropMarginPx(radiusPx: Float, extraPx: Float): Float =
+        BLUR_SIGMA_MARGIN * blurSigmaPx(radiusPx) + extraPx
 
-    /** The resolution a kind of pane renders at: 1, or 0.5 on dense screens. */
-    fun paneScale(kind: LiquidGlassKind, density: Float): Float =
-        if (kind.halfResolution && density >= HALF_RES_MIN_DENSITY) 0.5f else 1f
-
-    /** Every number of a pane, in the SURFACE's pixels (not the layer's). */
-    fun profile(kind: LiquidGlassKind, density: Float, dark: Boolean): LiquidGlassProfile {
-        val blur = kind.blurDp * density
-        val depth = kind.depthDp * density
-        return LiquidGlassProfile(
+    /** Every number of a pane, in the SURFACE's pixels. */
+    fun profile(kind: LiquidGlassKind, density: Float, dark: Boolean): LiquidGlassProfile =
+        LiquidGlassProfile(
             kind = kind,
-            scale = paneScale(kind, density),
-            blurRadiusPx = blur,
+            blurRadiusPx = kind.blurDp * density,
             lensBandPx = kind.bandDp * density,
-            lensDepthPx = depth,
+            lensDepthPx = kind.depthDp * density,
             magnify = kind.magnify,
             dispersion = (if (dark) DARK_DISPERSION else LIGHT_DISPERSION) * kind.dispersionShare,
             rimLight = (if (dark) DARK_RIM_LIGHT else LIGHT_RIM_LIGHT) * kind.lightShare,
             rimShade = (if (dark) DARK_RIM_SHADE else LIGHT_RIM_SHADE) * kind.shadeShare,
             specular = kind.specular(dark),
-            marginPx = backdropMarginPx(blur, depth, MARGIN_AIR_DP * density),
+            marginPx = backdropMarginPx(kind.blurDp * density, MARGIN_AIR_DP * density),
         )
-    }
 
     /**
      * Horizontal scale of the travelling selection lens. `distanceSlots` is
@@ -281,8 +291,6 @@ object LiquidGlass {
 @Stable
 class LiquidGlassProfile internal constructor(
     val kind: LiquidGlassKind,
-    /** Layer pixels per surface pixel. */
-    val scale: Float,
     val blurRadiusPx: Float,
     val lensBandPx: Float,
     val lensDepthPx: Float,
@@ -291,19 +299,88 @@ class LiquidGlassProfile internal constructor(
     val rimLight: Float,
     val rimShade: Float,
     val specular: Float,
-    /** Real content kept around the pane on every side (surface pixels). */
+    /** Real content kept around the pane on every side (pixels). */
     val marginPx: Float,
 ) {
-    /** Whether the lens shader runs for this pane at the refractive tier. */
-    val bends: Boolean get() = lensDepthPx > 0f && magnify > 1f
+    /** Width of the effect layer for a surface [width]. */
+    fun layerWidth(width: Float): Int = ceil(width + 2f * marginPx).toInt().coerceAtLeast(1)
 
-    /** Width of the effect layer for a surface [width] (surface pixels). */
-    fun layerWidth(width: Float): Int =
-        ceil((width + 2f * marginPx) * scale).toInt().coerceAtLeast(1)
+    /** Height of the effect layer for a surface [height]. */
+    fun layerHeight(height: Float): Int = ceil(height + 2f * marginPx).toInt().coerceAtLeast(1)
+}
 
-    /** Height of the effect layer for a surface [height] (surface pixels). */
-    fun layerHeight(height: Float): Int =
-        ceil((height + 2f * marginPx) * scale).toInt().coerceAtLeast(1)
+/**
+ * Signed distance from a point of a pane to its rim: negative inside. The
+ * pane is a rounded rect of half size [halfWidth] x [halfHeight] (a corner
+ * radius of [corner]) centred on the origin — the same arithmetic as
+ * [LIQUID_LENS_SKSL], in plain floats for the tests.
+ */
+internal fun paneDistance(
+    x: Float,
+    y: Float,
+    halfWidth: Float,
+    halfHeight: Float,
+    corner: Float,
+): Float {
+    val ex = abs(x) - (halfWidth - corner)
+    val ey = abs(y) - (halfHeight - corner)
+    return hypot(max(ex, 0f), max(ey, 0f)) + min(max(ex, ey), 0f) - corner
+}
+
+/**
+ * The lens mapping of [LIQUID_LENS_SKSL] in plain floats: the point of the
+ * page that the pane point (x, y) shows, both measured from the pane's
+ * centre. The unit tests run THIS over every pane of the app to hold the
+ * shipped numbers to their two promises — confined (no sample beyond the
+ * rim) and fold-free (a positive Jacobian everywhere); the render harness
+ * holds the shader text itself to the same.
+ */
+internal fun lensSample(
+    x: Float,
+    y: Float,
+    halfWidth: Float,
+    halfHeight: Float,
+    corner: Float,
+    band: Float,
+    depth: Float,
+    magnify: Float,
+): Offset {
+    val coreX = halfWidth - corner
+    val coreY = halfHeight - corner
+    val dist = paneDistance(x, y, halfWidth, halfHeight, corner)
+    // the outward normal of the nearest rim point (the straight middle has none)
+    val ox = x - x.coerceIn(-coreX, coreX)
+    val oy = y - y.coerceIn(-coreY, coreY)
+    val length = max(hypot(ox, oy), 0.0001f)
+    val across = (-dist / band).coerceIn(0f, 1f)
+    val ease = across * across * (3f - 2f * across)
+    val bevel = 1f - ease
+    val m = 1f + (magnify - 1f) * ease
+    val reach = bevel * depth
+    return Offset((x - ox / length * reach) / m, (y - oy / length * reach) / m)
+}
+
+/**
+ * Where [LIQUID_LENS_SKSL]'s `frosted` reads the missing half of the frost
+ * for the pane point (x, y): its reflection across the nearest rim point —
+ * as far OUTSIDE the rim as the point lies inside it. The same arithmetic
+ * as the shader, in plain floats for the tests. A point of the straight
+ * middle (no nearest rim point) is its own mirror.
+ */
+internal fun paneMirror(
+    x: Float,
+    y: Float,
+    halfWidth: Float,
+    halfHeight: Float,
+    corner: Float,
+): Offset {
+    val coreX = halfWidth - corner
+    val coreY = halfHeight - corner
+    val ox = x - x.coerceIn(-coreX, coreX)
+    val oy = y - y.coerceIn(-coreY, coreY)
+    val length = max(hypot(ox, oy), 0.0001f)
+    val reach = 2f * paneDistance(x, y, halfWidth, halfHeight, corner)
+    return Offset(x - ox / length * reach, y - oy / length * reach)
 }
 
 /**
@@ -313,17 +390,40 @@ class LiquidGlassProfile internal constructor(
  * backdrop margin — so the shape itself is the rectangle
  * [paneLeft, paneTop, paneRight, paneBottom] inside it. For every pixel
  * the shader computes the rounded-rect signed distance to the rim and the
- * outward normal there; inside the band it slides the sampling point
- * OUTWARD along that normal (a smoothstep of how close to the rim the
- * pixel is), so what lies just outside the pane appears bent into its
- * edge — the refraction a thick glass pane gives its surroundings. The
- * whole pane is magnified a little about its centre so it reads as a lens.
+ * outward normal there.
  *
- * Three more touches make it glass even where the page is plain: red and
+ * v1.6.0-beta.14 (device report on beta.13: an upside-down copy of the
+ * strip UNDER the menu appeared inside the menu's bottom edge). The old
+ * band slid the sampling point OUTWARD along the normal, by up to 18dp, so
+ * the rim drew what lies beyond the pane — at the bottom edge that is the
+ * gap and the navigation strip below the bar, laid into the bar. The lens
+ * now works the other way round, like a real convex glass: the bevel pulls
+ * the sample INWARD, by at most `lensDepth`, so the rim shows the page from
+ * a little inside the rim and nothing from beyond it can ever be drawn;
+ * and the middle of the pane is magnified about its centre (1 = flat), so a
+ * near-round lens reads as a lens. Both eases are smoothsteps of the
+ * distance to the rim over one `lensBand`, which keeps the mapping free of
+ * folds as long as the depth stays below two thirds of the band.
+ *
+ * The second half of the bug was the frost's own. The pane's layer used to
+ * carry the real page in a margin around the pane so the blur would have
+ * "enough to mix" at the rim — and it mixed exactly what must not be there:
+ * the blur of a point 4px inside the bar's bottom edge draws up to ~32px
+ * beyond the rim (measured on the harness: the blue probe line 6px under
+ * the bar tinted 1158 pixels inside it). The layer now holds the pane's
+ * backdrop clipped to the pane and nothing past the rim, and `frosted`
+ * completes the blur where it is missing: for a straight edge, the blur of
+ * a mirror-padded image is the blur of the clipped one plus the same blur
+ * read at the point's reflection across the rim. Each sample therefore
+ * costs two reads (three with dispersion).
+ *
+ * Three more touches make it glass even where the page is plain. Red and
  * blue are refracted a hair further than green (dispersion — the faint
- * prism an edge of thick glass shows), the band is shaded as a curved
+ * prism an edge of thick glass shows); the band is shaded as a curved
  * surface would be (lit where its normal faces the lamp, darker where it
- * turns away), and a specular ring glints on the lit side of the rim.
+ * turns away) with a specular ring glinting on the lit side of the rim;
+ * and the backdrop's saturation is lifted (the vibrancy) here, inside the
+ * same pass, instead of in a colour filter of its own.
  */
 internal val LIQUID_LENS_SKSL: String = """
 // <lens-shader>
@@ -340,10 +440,29 @@ uniform float dispersion;
 uniform float rimLight;
 uniform float rimShade;
 uniform float specular;
+uniform float saturation;
 
-float4 throughLens(float2 p, float2 c, float2 n, float bend, float spread) {
-    float2 shifted = p + n * (bend * lensDepth * spread);
-    return content.eval(c + (shifted - c) / magnify);
+// Signed distance from a point to the pane's rim: negative inside. The point
+// is measured from the pane's centre; the pane is the rounded rect of half
+// size (core + radius).
+float paneDistance(float2 q, float2 core, float radius) {
+    float2 e = abs(q) - core;
+    return length(max(e, float2(0.0, 0.0))) + min(max(e.x, e.y), 0.0) - radius;
+}
+
+// The blurred layer holds the backdrop UNDER the pane and nothing past its
+// rim, so near a rim the blur is missing the half of its kernel that lies
+// outside. That half would see the pane's own mirror image, and the blur of
+// a mirror-padded edge is the clipped blur plus the same blur read at the
+// point's reflection across the rim — so that is what completes the sample.
+// Both reads are premultiplied; their sum is divided by its own alpha.
+float4 frosted(float2 s, float2 c, float2 core, float radius) {
+    float2 q = s - c;
+    float2 outward = q - clamp(q, -core, core);
+    float2 n = outward / max(length(outward), 0.0001);
+    float2 mirror = s - 2.0 * paneDistance(q, core, radius) * n;
+    float4 sum = content.eval(s) + content.eval(mirror);
+    return float4(sum.rgb / max(sum.a, 0.0001), 1.0);
 }
 
 half4 main(float2 p) {
@@ -351,23 +470,40 @@ half4 main(float2 p) {
     float2 h = float2(paneRight - paneLeft, paneBottom - paneTop) * 0.5;
     float2 core = h - float2(cornerRadius, cornerRadius);
     float2 q = p - c;
-    float2 e = abs(q) - core;
-    float2 outside = max(e, float2(0.0, 0.0));
-    float dist = length(outside) + min(max(e.x, e.y), 0.0) - cornerRadius;
+    float dist = paneDistance(q, core, cornerRadius);
+    // past the rim the node is clipped away; the copy's own fade goes on
+    // there, so the clip's anti-aliased edge has the page's colour under it
+    // rather than the black of an empty layer
+    if (dist > 0.0) {
+        float4 raw = content.eval(p);
+        return half4(raw.rgb / max(raw.a, 0.0001), 1.0);
+    }
+    // the outward normal of the nearest rim point (the straight middle has none)
     float2 outward = q - clamp(q, -core, core);
     float2 n = outward / max(length(outward), 0.0001);
-    float t = clamp(dist / lensBand + 1.0, 0.0, 1.0);
-    float bend = t * t * (3.0 - 2.0 * t);
-    float4 middle = throughLens(p, c, n, bend, 1.0);
-    float4 warm = throughLens(p, c, n, bend, 1.0 + dispersion);
-    float4 cool = throughLens(p, c, n, bend, 1.0 - dispersion);
-    float4 col = float4(warm.r, middle.g, cool.b, middle.a);
+    // 0 on the rim, 1 one band-width inside it
+    float across = clamp(-dist / lensBand, 0.0, 1.0);
+    float ease = across * across * (3.0 - 2.0 * across);
+    // the bevel: full on the rim, gone one band inside it
+    float bevel = 1.0 - ease;
+    // the lens magnifies about its centre; on the rim it lies flat
+    float m = 1.0 + (magnify - 1.0) * ease;
+    float bend = bevel * lensDepth;
+    // the sample is pulled INWARD along the normal: it never leaves the pane
+    float4 middle = frosted(c + (p - n * bend - c) / m, c, core, cornerRadius);
+    float4 warm = frosted(c + (p - n * bend * (1.0 + dispersion) - c) / m, c, core, cornerRadius);
+    float4 cool = frosted(c + (p - n * bend * (1.0 - dispersion) - c) / m, c, core, cornerRadius);
+    float4 col = float4(warm.r, middle.g, cool.b, 1.0);
+    // vibrancy: the backdrop's colour is lifted under the glass
+    float luma = dot(col.rgb, float3(0.213, 0.715, 0.072));
+    col.rgb = float3(luma) + (col.rgb - float3(luma)) * saturation;
+    // a lamp above, and a little to the left
     float facing = dot(n, float2(-0.3, -0.954));
     float lit = max(facing, 0.0);
     float away = max(-facing, 0.0);
-    float edge = bend * bend * bend;
-    col.rgb = col.rgb * (1.0 - bend * rimShade * away)
-        + float3(bend * rimLight * lit + edge * specular * lit);
+    float edge = bevel * bevel * bevel;
+    col.rgb = col.rgb * (1.0 - bevel * rimShade * away)
+        + float3(bevel * rimLight * lit + edge * specular * lit);
     return half4(col);
 }
 // </lens-shader>
@@ -412,6 +548,13 @@ val DarkLiquidField = LiquidGlassField(
  * The light the material is made of, resolved per colour scheme. Everything
  * here is drawn OVER the pane; the text and icon colours stay the Material
  * roles they always were.
+ *
+ * v1.6.0-beta.14 (device report: the glass was white and lifeless). The
+ * washes are what a pane lays between the user and the page, so they are
+ * kept LOW and the page carries the colour: beta.13's bar drew 74% white
+ * over its own frosted copy (measured: every pixel of the bar within two
+ * levels of white), and the selection lens another 50% plus a tint — a
+ * pale shadow of a lens.
  */
 @Stable
 class LiquidGlassColors(
@@ -425,13 +568,14 @@ class LiquidGlassColors(
     val rimTop: Color,
     /** … and quiet where it leaves (bottom). */
     val rimBottom: Color,
-    /** The selection lens: a wash keeping it legible … */
+    /** The selection lens: almost no wash at all — it is clear glass. */
     val lensBase: Color,
-    /** … a tint of the primary light, so the droplet reads as raised, … */
-    val lensTint: Color,
-    /** … its own hairline rim and the specular band under its upper edge. */
-    val lensRim: Color,
-    val lensSpec: Color,
+    /** Its hairline rim: a glint along the upper edge … */
+    val lensRimTop: Color,
+    /** … fading round to a quiet lower edge. */
+    val lensRimBottom: Color,
+    /** The floating action button's wash: it carries a label, so it milks the list a little. */
+    val fabTint: Color,
     /** The soft brightening that spreads under a slot while it is pressed. */
     val bloom: Color,
     /** The contact shadow the selection lens casts on the bar's pane. */
@@ -449,19 +593,22 @@ class LiquidGlassColors(
 )
 
 val LightLiquidGlass = LiquidGlassColors(
-    paneTint = Color(0xBDFFFFFF),
-    sheen = Color(0x38FFFFFF),
-    innerShade = Color(0x1A002A6B),
+    paneTint = Color(0x3DFFFFFF),
+    sheen = Color(0x14FFFFFF),
+    innerShade = Color(0x1A001B3D),
     rimTop = Color(0xF2FFFFFF),
-    rimBottom = Color(0x598256C7),
-    lensBase = Color(0x80FFFFFF),
-    lensTint = Color(0x42B388FF),
-    lensRim = Color(0xB3FFFFFF),
-    lensSpec = Color(0xCCFFFFFF),
-    bloom = Color(0x59FFFFFF),
-    lensShadow = Color(0x334A3B76),
-    // Near-white glass cannot be lit any whiter: its curvature comes from
-    // the shade and the specular ring alone.
+    rimBottom = Color(0x66708499),
+    lensBase = Color(0x0DFFFFFF),
+    lensRimTop = Color(0xE6FFFFFF),
+    lensRimBottom = Color(0x4DFFFFFF),
+    fabTint = Color(0x73FFFFFF),
+    bloom = Color(0x2EFFFFFF),
+    lensShadow = Color(0x3D4A3B76),
+    // beta.13 had NO rim light in this scheme ("near-white glass cannot be
+    // lit whiter") — true of a pane that was 74% white, and the reason its
+    // edge refraction was invisible. Over a pane that lets the page
+    // through, a lit bevel and a shaded one both show; the shade carries
+    // the edge wherever the page is white.
     rimLight = LiquidGlass.LIGHT_RIM_LIGHT,
     rimShade = LiquidGlass.LIGHT_RIM_SHADE,
     dispersion = LiquidGlass.LIGHT_DISPERSION,
@@ -470,17 +617,17 @@ val LightLiquidGlass = LiquidGlassColors(
 )
 
 val DarkLiquidGlass = LiquidGlassColors(
-    paneTint = Color(0xB812101A),
-    sheen = Color(0x12FFFFFF),
+    paneTint = Color(0x8012101A),
+    sheen = Color(0x14FFFFFF),
     innerShade = Color(0x73000000),
     rimTop = Color(0xD9B18AFB),
     rimBottom = Color(0x40B18AFB),
-    lensBase = Color(0x591A1626),
-    lensTint = Color(0x3D6650A0),
-    lensRim = Color(0x80FFFFFF),
-    lensSpec = Color(0xB3FFFFFF),
-    bloom = Color(0x40FFFFFF),
-    lensShadow = Color(0x99000000),
+    lensBase = Color(0x1AFFFFFF),
+    lensRimTop = Color(0xF2D6C6FF),
+    lensRimBottom = Color(0x59FFFFFF),
+    fabTint = Color(0x661A1626),
+    bloom = Color(0x26FFFFFF),
+    lensShadow = Color(0xB3000000),
     // On OLED black the rim GLOWS: additive light along the upper edge is
     // what makes an empty page read as a curved lens.
     rimLight = LiquidGlass.DARK_RIM_LIGHT,
@@ -734,11 +881,26 @@ fun Modifier.liquidGlassAnchor(anchor: LiquidGlassAnchor): Modifier =
 
 /** The effect of one pane, rebuilt only when what it depends on changes. */
 private class PaneEffect {
-    var size = IntSize.Zero
+    var size = Size.Zero
     var corner = 0f
     var profile: LiquidGlassProfile? = null
     var tier: LiquidGlassTier? = null
+    var shape: Shape? = null
+    var direction: LayoutDirection? = null
     var effect: RenderEffect? = null
+
+    /**
+     * True when the effect ends in the lens shader, the only thing that
+     * completes the frost at a rim; without it the copy needs the base
+     * colour under it (see [Modifier.liquidGlassPane]).
+     */
+    var lens = false
+
+    /** The pane's outline, where it sits in its own effect layer (moved in by the margin). */
+    var outline: Path? = null
+
+    /** The effect last handed to the pane's layer, so a steady frame never re-applies it. */
+    private var attached: RenderEffect? = null
 
     fun get(
         tier: LiquidGlassTier,
@@ -747,23 +909,46 @@ private class PaneEffect {
         width: Float,
         height: Float,
         density: Density,
+        layoutDirection: LayoutDirection,
     ): RenderEffect? {
         if (width <= 0f || height <= 0f || Build.VERSION.SDK_INT < 31) return null
-        val w = width.toInt()
-        val h = height.toInt()
+        val size = Size(width, height)
         val r = cornerRadiusPx(shape, min(width, height), density)
-        if (w != size.width || h != size.height || r != corner ||
-            profile != this.profile || tier != this.tier || effect == null
+        if (size != this.size || r != corner || profile != this.profile || tier != this.tier ||
+            shape !== this.shape || layoutDirection != direction || effect == null
         ) {
-            effect = Api31.paneEffect(tier, profile, IntSize(w, h), r)
-            size = IntSize(w, h)
+            val frost = Api31.paneEffect(tier, profile, size, r)
+            effect = frost.effect
+            lens = frost.lens
+            this.size = size
             corner = r
             this.profile = profile
             this.tier = tier
+            this.shape = shape
+            direction = layoutDirection
+            outline = paneOutline(shape, size, density, layoutDirection).apply {
+                translate(Offset(profile.marginPx, profile.marginPx))
+            }
         }
         return effect
     }
+
+    /** Gives the pane's layer its effect — once per change, not once per frame. */
+    fun attach(pane: GraphicsLayer) {
+        if (attached !== effect) {
+            pane.renderEffect = effect
+            attached = effect
+        }
+    }
 }
+
+/** The shape as a path over its own size (no offset: the pane's top-left is the origin). */
+private fun paneOutline(shape: Shape, size: Size, density: Density, layoutDirection: LayoutDirection): Path =
+    when (val outline = shape.createOutline(size, layoutDirection, density)) {
+        is Outline.Rounded -> Path().apply { addRoundRect(outline.roundRect) }
+        is Outline.Generic -> outline.path
+        is Outline.Rectangle -> Path().apply { addRect(outline.rect) }
+    }
 
 /**
  * One pane of glass behind the content of the node it is applied to:
@@ -771,18 +956,24 @@ private class PaneEffect {
  *  1. the node is clipped to [shape];
  *  2. its own small [GraphicsLayer] gets a copy of the [scene]'s field —
  *     plus the live [content] source when there is one — shifted so the
- *     copy lines up with the real pixels, and grown by the profile's
- *     margin of real content;
- *  3. that layer carries the frost chain (and the lens at the refractive
- *     tier) as its render effect, so the TEXT and ICONS drawn afterwards
- *     are never blurred — only the backdrop copy is;
+ *     copy lines up with the real pixels, and CLIPPED to the pane's own
+ *     outline: past a rim the layer holds nothing of the page. It is still
+ *     grown by the profile's margin, but only as room for the blur's fade
+ *     ([LiquidGlass.backdropMarginPx]); the lens shader completes that fade
+ *     with the pane's mirror image ([LIQUID_LENS_SKSL]). Where there is no
+ *     lens — the frost-only tier, or a driver that rejected the shader —
+ *     the field's base colour is laid under the copy instead, and the copy
+ *     fades into it over the last blur width;
+ *  3. that layer carries the frost chain (blur, and the lens at the
+ *     refractive tier) as its render effect, so the TEXT and ICONS drawn
+ *     afterwards are never blurred — only the backdrop copy is;
  *  4. over it the flat [tint] and, with [light], the sheen and the contact
  *     shade — full-width gradients, never a hard-edged shape.
  *
  * Until the node has been measured the pane paints only the tint (it never
  * flashes a sharp copy of the page). [shift] moves the sampling window for
- * panes that travel by transform; [anchor] supplies the position of such
- * a pane (see [LiquidGlassAnchor]).
+ * panes that travel by transform; [anchor] supplies the position of such a
+ * pane (see [LiquidGlassAnchor]).
  */
 @Composable
 fun Modifier.liquidGlassPane(
@@ -811,12 +1002,11 @@ fun Modifier.liquidGlassPane(
             val w = b.width
             val h = b.height
             if (w <= 0f || h <= 0f) return@drawBehind
-            val effect = cache.get(scene.tier, profile, shape, w, h, density)
+            val effect = cache.get(scene.tier, profile, shape, w, h, density, layoutDirection)
             if (effect == null) {
                 drawRect(tint)
                 return@drawBehind
             }
-            val s = profile.scale
             val m = profile.marginPx
             // which root point sits at the pane layer's (0, 0)
             val origin = b.topLeft + shift() - Offset(m, m)
@@ -825,9 +1015,10 @@ fun Modifier.liquidGlassPane(
                 layoutDirection,
                 IntSize(profile.layerWidth(w), profile.layerHeight(h)),
             ) {
-                scale(s, s, pivot = Offset.Zero) {
-                    // the base colour first: the copy is opaque into its margin
-                    drawRect(scene.colors.field.base)
+                // no lens to complete the frost: the copy fades into the base
+                if (!cache.lens) drawRect(scene.colors.field.base)
+                // the pane's backdrop, and nothing from beyond its rim
+                clipPath(checkNotNull(cache.outline)) {
                     translate(scene.field.origin.x - origin.x, scene.field.origin.y - origin.y) {
                         drawLayer(scene.field.layer)
                     }
@@ -838,17 +1029,16 @@ fun Modifier.liquidGlassPane(
                     }
                 }
             }
-            pane.renderEffect = effect
-            scale(1f / s, 1f / s, pivot = Offset.Zero) {
-                translate(-m, -m) { drawLayer(pane) }
-            }
+            cache.attach(pane)
+            // the layer carries the margin on every side: drop it
+            translate(-m, -m) { drawLayer(pane) }
             drawRect(tint)
             if (light) drawGlassLight(scene.colors)
         }
 }
 
 /** Sheen from the top, contact shade at the bottom — gradients that span the whole clip. */
-private fun DrawScope.drawGlassLight(colors: LiquidGlassColors) {
+internal fun DrawScope.drawGlassLight(colors: LiquidGlassColors) {
     val h = size.height
     drawRect(
         Brush.verticalGradient(
@@ -891,63 +1081,74 @@ internal fun cornerRadiusPx(shape: Shape, shortest: Float, density: Density): Fl
     }
 }
 
+/** What a pane's frost is made of: the chain, and whether the lens is its last link. */
+private class PaneFrost(val effect: RenderEffect, val lens: Boolean)
+
 @RequiresApi(31)
 private object Api31 {
-    /** Frost: blur -> vibrancy, then (13+) the lens. Each step wraps the last. */
+    /**
+     * One chain: blur, then (Android 13+) the lens — which carries the
+     * vibrancy in its own pass — or the vibrancy alone below 13 and wherever
+     * a driver rejects the shader. Each step wraps the ones before it.
+     */
     fun paneEffect(
         tier: LiquidGlassTier,
         profile: LiquidGlassProfile,
-        surfaceSize: IntSize,
+        surfaceSize: Size,
         cornerPx: Float,
-    ): RenderEffect {
-        val s = profile.scale
-        val radius = profile.blurRadiusPx * s
+    ): PaneFrost {
+        val radius = profile.blurRadiusPx
         val blur = android.graphics.RenderEffect.createBlurEffect(
             radius,
             radius,
             android.graphics.Shader.TileMode.CLAMP,
         )
+        if (tier == LiquidGlassTier.REFRACTIVE && Build.VERSION.SDK_INT >= 33) {
+            // A driver that rejects the shader must not take the frost
+            // down with it: the pane keeps blurring without the bend.
+            val lens = runCatching { Api33.lensEffect(profile, surfaceSize, cornerPx) }.getOrNull()
+            if (lens != null) {
+                return PaneFrost(
+                    android.graphics.RenderEffect.createChainEffect(lens, blur).asComposeRenderEffect(),
+                    lens = true,
+                )
+            }
+        }
         val vibrancy = android.graphics.RenderEffect.createColorFilterEffect(
             android.graphics.ColorMatrixColorFilter(
                 android.graphics.ColorMatrix().apply { setSaturation(LiquidGlass.SATURATION) },
             ),
         )
-        var chain = android.graphics.RenderEffect.createChainEffect(vibrancy, blur)
-        if (tier == LiquidGlassTier.REFRACTIVE && profile.bends && Build.VERSION.SDK_INT >= 33) {
-            // A driver that rejects the shader must not take the frost
-            // down with it: the pane keeps blurring without the bend.
-            runCatching {
-                val lens = Api33.lensEffect(profile, surfaceSize, cornerPx)
-                chain = android.graphics.RenderEffect.createChainEffect(lens, chain)
-            }
-        }
-        return chain.asComposeRenderEffect()
+        return PaneFrost(
+            android.graphics.RenderEffect.createChainEffect(vibrancy, blur).asComposeRenderEffect(),
+            lens = false,
+        )
     }
 }
 
 @RequiresApi(33)
 private object Api33 {
-    /** The refraction lens over the already-frosted pane (see [LIQUID_LENS_SKSL]). */
+    /** The refraction lens over the already-blurred pane (see [LIQUID_LENS_SKSL]). */
     fun lensEffect(
         profile: LiquidGlassProfile,
-        surfaceSize: IntSize,
+        surfaceSize: Size,
         cornerPx: Float,
     ) = android.graphics.RenderEffect.createRuntimeShaderEffect(
         android.graphics.RuntimeShader(LIQUID_LENS_SKSL).apply {
-            val s = profile.scale
-            val m = profile.marginPx * s
+            val m = profile.marginPx
             setFloatUniform("paneLeft", m)
             setFloatUniform("paneTop", m)
-            setFloatUniform("paneRight", surfaceSize.width * s + m)
-            setFloatUniform("paneBottom", surfaceSize.height * s + m)
-            setFloatUniform("cornerRadius", cornerPx * s)
-            setFloatUniform("lensBand", profile.lensBandPx * s)
-            setFloatUniform("lensDepth", profile.lensDepthPx * s)
+            setFloatUniform("paneRight", surfaceSize.width + m)
+            setFloatUniform("paneBottom", surfaceSize.height + m)
+            setFloatUniform("cornerRadius", cornerPx)
+            setFloatUniform("lensBand", profile.lensBandPx)
+            setFloatUniform("lensDepth", profile.lensDepthPx)
             setFloatUniform("magnify", profile.magnify)
             setFloatUniform("dispersion", profile.dispersion)
             setFloatUniform("rimLight", profile.rimLight)
             setFloatUniform("rimShade", profile.rimShade)
             setFloatUniform("specular", profile.specular)
+            setFloatUniform("saturation", LiquidGlass.SATURATION)
         },
         "content",
     )

@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.background
 import androidx.compose.material3.Icon
@@ -46,7 +47,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -56,6 +56,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -410,13 +411,24 @@ fun TurnyptApp(liquidGlassMenu: Boolean = true) {
  * ([liquidGlassPane]), each a COPY of the recorded page, frosted and bent
  * by its own RenderEffect chain:
  *
- *  - the BAR samples the page under its own footprint (blur 14dp);
- *  - the LENS is a second, clearer pane (blur 6dp, magnified) that
- *    samples the page at the slot it currently floats over — so it reads
- *    as a thick droplet of the same glass rather than as paint.
+ *  - the BAR samples the page under its own footprint (blur 11dp) and is
+ *    nearly flat in the middle: its 10dp bevel bends only the rim;
+ *  - the LENS is a second, clearer pane (blur 7dp) that magnifies its
+ *    middle by 10% and samples the page at the slot it currently floats
+ *    over — so it reads as a thick droplet of the same glass rather than
+ *    as paint.
  *
- * The light on top of a pane is one flat tint plus gradients that span
- * the whole clip. Nothing soft is a hard-edged shape: beta.11's
+ * v1.6.0-beta.14 (device report on beta.13: a white, lifeless bar; a
+ * selection lens that looked like a dead white shadow). The bar drew 74%
+ * white over its own copy and the lens another 50% plus a tint, so neither
+ * let the page through. Both washes are now low, the lens carries no fill
+ * beyond a rim and a contact shadow, and its shape comes from the shader's
+ * own lit and shaded bevel — a transparent lens over the frosted bar. Its
+ * size is the slot less 3dp on every side, and the label is sized to fit
+ * INSIDE it, so the lens is always wider than what it wraps.
+ *
+ * The light on top of a pane is one flat tint plus gradients that span the
+ * whole clip. Nothing soft is a hard-edged shape: beta.11's
  * BlurMaskFilter is not rendered by the hardware canvas at all, and
  * beta.12's replacement (a hard inner rounded-rect, a ring and a 7dp
  * specular stripe) reached the device as "a pill inside the pill" and a
@@ -463,7 +475,16 @@ internal fun FloatingGlassNavBar(
     val rimBrush = remember(colors) {
         Brush.verticalGradient(0f to colors.rimTop, 1f to colors.rimBottom)
     }
-    val lensRimBrush = remember(colors) { SolidColor(colors.lensRim) }
+    // The lens's rim is a glint, not a frame: bright along its upper edge,
+    // gone by the lower one (a diagonal gradient: the lamp is up and left).
+    val lensRimBrush = remember(colors) {
+        Brush.linearGradient(
+            0f to colors.lensRimTop,
+            0.6f to colors.lensRimBottom,
+            start = Offset.Zero,
+            end = Offset.Infinite,
+        )
+    }
 
     // The pill's own material: the live pane (a frosted, bent copy of the
     // page) with the rim over it, or the flat v1.5 surface on the static
@@ -502,75 +523,81 @@ internal fun FloatingGlassNavBar(
                 .fillMaxWidth()
                 .padding(6.dp),
         ) {
-            val density = LocalDensity.current
-            val slotWidth = maxWidth / destinations.size
-            val slotPx = with(density) { slotWidth.toPx() }
-            // v1.6.0-beta.13: the lens travels by a layer translation and
-            // stretches by a layer scale, so its LAYOUT position never
-            // changes — the pane is pointed at its real place by an anchor
-            // outside those transforms plus the translation itself.
-            val anchor = rememberLiquidGlassAnchor()
+        val density = LocalDensity.current
+        val slotWidth = maxWidth / destinations.size
+        val slotPx = with(density) { slotWidth.toPx() }
+        // v1.6.0-beta.14: the lens is the slot less this much on every side.
+        val lensInset = 3.dp
+        // v1.6.0-beta.13: the lens travels by a layer translation and
+        // stretches by a layer scale, so its LAYOUT position never
+        // changes — the pane is pointed at its real place by an anchor
+        // outside those transforms plus the translation itself.
+        val anchor = rememberLiquidGlassAnchor()
 
-            // The selection lens under the active slot: one layer translate
-            // per frame.
-            Box(modifier = Modifier.matchParentSize()) {
+        // The selection lens under the active slot: one layer translate
+        // per frame.
+        Box(modifier = Modifier.matchParentSize()) {
+            Box(
+                modifier = Modifier
+                    .width(slotWidth)
+                    .fillMaxHeight()
+                    .padding(lensInset)
+                    .then(if (live) Modifier.liquidGlassAnchor(anchor) else Modifier),
+            ) {
                 Box(
                     modifier = Modifier
-                        .width(slotWidth)
-                        .fillMaxHeight()
-                        .padding(horizontal = 4.dp, vertical = 5.dp)
-                        .then(if (live) Modifier.liquidGlassAnchor(anchor) else Modifier),
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationX = direction * slotPx * selectionFraction.value
+                        },
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                translationX = direction * slotPx * selectionFraction.value
-                            },
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    // Liquid: the lens stretches along its
-                                    // flight and gives the height back, so it
-                                    // holds its volume.
-                                    val stretch = if (live) {
-                                        LiquidGlass.lensStretch(selectedIndex - selectionFraction.value)
-                                    } else {
-                                        1f
-                                    }
-                                    scaleX = stretch
-                                    scaleY = LiquidGlass.lensSquash(stretch)
+                                // Liquid: the lens stretches along its
+                                // flight and gives the height back, so it
+                                // holds its volume.
+                                val stretch = if (live) {
+                                    LiquidGlass.lensStretch(selectedIndex - selectionFraction.value)
+                                } else {
+                                    1f
                                 }
-                                .then(
-                                    if (scene != null) {
-                                        Modifier
-                                            .shadow(
-                                                elevation = 4.dp,
-                                                shape = barShape,
-                                                clip = true,
-                                                ambientColor = colors.lensShadow,
-                                                spotColor = colors.lensShadow,
-                                            )
-                                            .liquidGlassPane(
-                                                scene = scene,
-                                                shape = barShape,
-                                                kind = LiquidGlassKind.LENS,
-                                                tint = colors.lensBase,
-                                                content = scene.page,
-                                                anchor = anchor,
-                                                shift = {
-                                                    Offset(
-                                                        direction * slotPx * selectionFraction.value,
-                                                        0f,
-                                                    )
-                                                },
-                                                light = false,
-                                            )
-                                            .drawBehind { drawRect(colors.lensTint) }
-                                            .liquidRim(barShape, lensRimBrush)
-                                    } else {
+                                scaleX = stretch
+                                scaleY = LiquidGlass.lensSquash(stretch)
+                            }
+                            .then(
+                                if (scene != null) {
+                                    // The lens floats over the bar's pane:
+                                    // its contact shadow falls on the bar,
+                                    // and the pane under it is clear glass
+                                    // (no sheen, no shade of its own — the
+                                    // shader lights its bevel).
+                                    Modifier
+                                        .shadow(
+                                            elevation = 3.dp,
+                                            shape = barShape,
+                                            clip = true,
+                                            ambientColor = colors.lensShadow,
+                                            spotColor = colors.lensShadow,
+                                        )
+                                        .liquidGlassPane(
+                                            scene = scene,
+                                            shape = barShape,
+                                            kind = LiquidGlassKind.LENS,
+                                            tint = colors.lensBase,
+                                            content = scene.page,
+                                            anchor = anchor,
+                                            shift = {
+                                                Offset(
+                                                    direction * slotPx * selectionFraction.value,
+                                                    0f,
+                                                )
+                                            },
+                                            light = false,
+                                        )
+                                        .liquidRim(barShape, lensRimBrush)
+                                } else {
                                         Modifier
                                             .clip(barShape)
                                             .background(scheme.primaryContainer)
@@ -589,6 +616,7 @@ internal fun FloatingGlassNavBar(
                         onClick = { onSelect(destination) },
                         live = live,
                         colors = colors,
+                        labelMaxWidth = slotWidth - lensInset * 2,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -605,6 +633,8 @@ private fun NavBarSlot(
     onClick: () -> Unit,
     live: Boolean,
     colors: LiquidGlassColors,
+    /** The width the label may take: the lens's own, so it never spills past the lens. */
+    labelMaxWidth: Dp,
     modifier: Modifier = Modifier,
 ) {
     val fg = if (selected) {
@@ -691,6 +721,10 @@ private fun NavBarSlot(
         // colour. At the old 0.72 alpha they failed 4.5:1 wherever dark
         // content passed under the pane; selection is now carried by the
         // colour role and the lens, not by fading text.
+        // v1.6.0-beta.14 (device report: the lens's shape and size): the
+        // label used to be sized to the SLOT, so a word narrower than the
+        // slot but wider than the lens inside it spilled past the lens's
+        // rim. It is now sized to the lens's own width.
         CompositionLocalProvider(LocalDensity provides labelDensity) {
             Text(
                 stringResource(destination.labelRes),
@@ -702,6 +736,7 @@ private fun NavBarSlot(
                     stepSize = 0.5.sp,
                 ),
                 style = LocalTextStyle.current.copy(lineHeight = 12.sp),
+                modifier = Modifier.widthIn(max = labelMaxWidth),
             )
         }
     }

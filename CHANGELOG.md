@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.14] - 2026-11-27 — the liquid glass, measured and fixed (prerelease)
+
+The user report, five points: an inverted copy of what lies below the bar
+showing inside the bar's bottom edge; the glass white and lifeless; the
+edge refraction invisible; the active tab's bubble a dead white shadow;
+frame time. Every fix was held to the render harness of beta.13, now with
+34 frames (light/dark x LTR/RTL, phase-coded ramps, probe-line pages,
+flights, a scrolled page, timed frames), beta.13 against beta.14. The
+numbers below are what the pixels decoded to.
+
+- **The bottom of the menu.** Two causes, one behind the other. The lens
+  mapping slid its sample OUTWARD at the rim, so the bottom edge drew the
+  page from beyond it (measured: 58px past the rim in light, the probe
+  line in the gap below the bar drawn 64px inside it in a dark RTL
+  flight). With that turned inward, the harness still caught the platform
+  blur smearing real page content from the layer's margin into the rim.
+  Now a pane's layer holds only its own backdrop, clipped to its outline,
+  and the lens shader completes the blur with the pane's mirror image —
+  zero extra page draws. Measured after the fix: 0 pixels of the probe
+  line in every frame (beta.13: 5 to 64), and the probe line lying just
+  inside the rim is seen through the glass where beta.13 showed nothing.
+- **Transparency.** The pane transmits 0.755 of the page in light (was
+  0.254) and 0.49 in dark (was 0.275); the lens 0.949 (was 0.369) and
+  0.898 (was 0.494). On a flat page the bar's own wash is 22-28% in
+  light, the lens's 8% in both themes.
+- **Edge refraction.** A 10dp bevel band bends the sample inward by up to
+  5dp at the rim, with dispersion and a rim light that faces the lamp:
+  the lit rim stands 1.40x the pane (was 1.10), the shaded one 0.93 (was
+  0.75).
+- **The selection lens.** Clear glass that magnifies 1.10 about its own
+  centre (measured 1.04 at its middle), inset 3dp x 9dp in its slot
+  (140 x 144px at xxhdpi, was 134 x 130).
+- **Frame time.** The half-resolution pass is gone and cards are no longer
+  glass panes: the same window renders in 111.5ms instead of 133.1, with
+  cards 133.1 instead of 221.1 (desktop hwui/Skia harness, mean of the two
+  slowest of three draws — not a device number).
+
+Where there is no lens shader (Android 12L, or a driver that rejects it)
+the pane fades into the field's base colour over the last blur width, so
+the rim never shows a dark fringe. This was verified on the desktop render
+harness, not on a device.
+
 ## [1.6.0-beta.13] - 2026-11-27 — one material for the whole design (prerelease)
 
 The user report: "stilll the main menu has many bugs you should debug it

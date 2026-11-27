@@ -270,15 +270,18 @@ fun Modifier.glassBackdrop(glass: GlassColors): Modifier =
 
 /**
  * v1.6.0-beta.13 (user brief: "make it for the whole design"): the glass
- * every surface in the window is made of.
+ * every surface in the window is made of — the same tint, sheen, contact
+ * shade and rim as the menu, drawn over whatever really lies behind the
+ * surface.
  *
- * On the live tiers this is a PANE of the window's [LiquidGlassScene] —
- * the same material the main menu is made of: a copy of what lies behind
- * the surface, frosted and bent, with the scene's rim over it. A surface
- * never samples a layer that contains itself, so a card reads the static
- * FIELD, not the page — cards sit directly on the field and a card that
- * sampled the page would blur its own output back into itself wherever
- * the two stacks overlap.
+ * v1.6.0-beta.14 (device report: frame time). A card used to be a PANE —
+ * a recorded copy of the field, blurred and run through the lens shader.
+ * But a card sits on the field, a gradient smooth over hundreds of pixels,
+ * so blur and lens gave back the field unchanged and the copy only added
+ * its cost: twelve cards cost more frame time than the menu itself. The
+ * card is drawn over the real field now, with the material's light; what
+ * it shows through itself is exactly what it showed before, without a
+ * capture or an effect pass.
  *
  * On the static tier (below Android 12, low-RAM, switched off) and for
  * surfaces that carry their own fill (avatars) this is the v1.5
@@ -306,12 +309,11 @@ fun Modifier.glassSurface(
                 ambientColor = glass.shadowColor,
                 spotColor = glass.shadowColor,
             )
-            .liquidGlassPane(
-                scene = scene,
-                shape = shape,
-                kind = LiquidGlassKind.CARD,
-                tint = tint,
-            )
+            .clip(shape)
+            .drawBehind {
+                drawRect(tint)
+                drawGlassLight(colors)
+            }
             .liquidRim(shape, rimBrush)
     } else {
         flatGlassSurface(glass, shape, tint)

@@ -197,7 +197,7 @@ fun ContactsScreen(viewModel: ContactsViewModel, biometrics: BiometricKeyStore) 
                             scene = fabScene,
                             shape = fabShape,
                             kind = LiquidGlassKind.FAB,
-                            tint = fabColors.lensBase,
+                            tint = fabColors.fabTint,
                             content = listSource,
                         )
                         .liquidRim(fabShape, fabRimBrush),
