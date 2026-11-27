@@ -51,6 +51,7 @@ import java.io.File
 import com.turnypt.app.R
 import com.turnypt.app.ToolsUiState
 import com.turnypt.app.companion.ImageFiles
+import com.turnypt.app.ui.GlassAlertDialog
 import com.turnypt.app.ui.theme.GlassRadii
 import com.turnypt.app.ui.theme.LocalGlassTokens
 import com.turnypt.app.ui.theme.glassSurface
@@ -499,7 +500,7 @@ fun CipherPreferenceDialog(
     onDismiss: () -> Unit,
 ) {
     var explain by remember { mutableStateOf(false) }
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.cipher_dialog_title)) },
         text = {

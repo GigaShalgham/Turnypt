@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -34,6 +35,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,10 +56,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.turnypt.app.R
 import com.turnypt.app.companion.UiNotice
+import com.turnypt.app.ui.theme.GlassRadii
 import com.turnypt.app.ui.theme.LocalGlassTokens
 import com.turnypt.app.ui.theme.LocalSemanticColors
+import com.turnypt.app.ui.theme.applyDialogBlur
+import com.turnypt.app.ui.theme.clearDialogBlur
 import com.turnypt.app.ui.theme.glassSurface
-import com.turnypt.app.ui.theme.GlassRadii
 import com.turnypt.security.policies.PassphraseAdvisor
 
 /**
@@ -766,7 +770,16 @@ fun ContactAvatar(
         modifier = modifier
             .size(40.dp)
             .background(stateFill, CircleShape)
-            .glassSurface(glass, CircleShape, tint = glass.tint.copy(alpha = glass.tint.alpha * 0.45f)),
+            // v1.6.0-beta.13: live = false — the avatar carries its own
+            // SOLID state under-fill (unlocked keeps its unmistakable green
+            // channel), so it must not blur what is under that fill. The
+            // flat rim and bevel keep it reading as glass.
+            .glassSurface(
+                glass,
+                CircleShape,
+                tint = glass.tint.copy(alpha = glass.tint.alpha * 0.45f),
+                live = false,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         // Persian names whose first codepoint is a joiner (ZWNJ or the
@@ -825,6 +838,64 @@ fun KeyboardDoneButton(modifier: Modifier = Modifier) {
 }
 
 /**
+ * v1.6.0-beta.13 (user brief: "make it for the whole design"): the app's
+ * dialogs become glass.
+ *
+ * A dialog is ANOTHER WINDOW, so a pane cannot sample the page behind it
+ * — the coordinates would address the wrong window (see
+ * [currentLiquidGlassScene]). What Android genuinely offers here is
+ * cross-window blur: `FLAG_BLUR_BEHIND` + `setBlurBehindRadius` let the
+ * platform compositor blur the app beneath the dialog, the same
+ * mechanism the translucent companion sheets use. Where the system
+ * allows it (Android 12+ and `isCrossWindowBlurEnabled`) the container
+ * is a translucent plate over a really blurred app; everywhere else it
+ * keeps the near-opaque surface dialogs have always had — honest
+ * translucency, no recreated blur pipeline.
+ *
+ * The shape joins the app's radius family (the sheet radius); the rim
+ * stays the M3 dialog's own hairline, so the dialog still reads as a
+ * platform dialog, only made of glass.
+ */
+@Composable
+fun GlassAlertDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    dismissButton: @Composable () -> Unit = {},
+    title: (@Composable () -> Unit)? = null,
+    text: (@Composable () -> Unit)? = null,
+) {
+    // This composable runs INSIDE the dialog's own window, so the view's
+    // parent chain reaches that window: the platform blurs the app
+    // beneath it while the dialog shows, and the flag is cleared again
+    // when it goes away. Where the system disallows cross-window blur
+    // the dialog keeps its near-opaque surface.
+    val view = androidx.compose.ui.platform.LocalView.current
+    var blurred by remember { mutableStateOf(false) }
+    DisposableEffect(view) {
+        val window = (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+        if (window != null) {
+            val density = view.resources.displayMetrics.density
+            blurred = applyDialogBlur(window, (24f * density).toInt()) > 0
+        }
+        onDispose { window?.let { clearDialogBlur(it) } }
+    }
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        confirmButton = confirmButton,
+        dismissButton = dismissButton,
+        modifier = modifier,
+        title = title,
+        text = text,
+        shape = GlassRadii.sheetShape,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+            alpha = if (blurred) 0.86f else 0.97f,
+        ),
+        tonalElevation = 0.dp,
+    )
+}
+
+/**
  * v0.5.2: the clipboard HISTORY dialog (user request: "the list of things
  * you copied and had copied before") — replaces the v0.5.1 single-clip
  * preview. Tap an entry to paste it into the field; the per-row ✕ deletes
@@ -839,7 +910,7 @@ fun ClipboardHistoryDialog(
     onClearAll: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    androidx.compose.material3.AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResourceCompat(R.string.clipboard_history_title)) },
         text = {
@@ -874,7 +945,7 @@ fun ClipboardHistoryDialog(
         },
         confirmButton = {
             if (entries.isNotEmpty()) {
-                androidx.compose.material3.TextButton(onClick = onClearAll) {
+                TextButton(onClick = onClearAll) {
                     Text(
                         stringResourceCompat(R.string.action_clear_history),
                         color = MaterialTheme.colorScheme.error,
@@ -883,7 +954,7 @@ fun ClipboardHistoryDialog(
             }
         },
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss) {
                 Text(stringResourceCompat(R.string.close))
             }
         },

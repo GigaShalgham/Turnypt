@@ -34,6 +34,7 @@ import com.turnypt.app.companion.ImageFiles
 import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.security.BiometricPromptHost
 import com.turnypt.app.security.rememberBiometricPromptHelper
+import com.turnypt.app.ui.theme.bottomClearance
 
 /**
  * In-app Encrypt tab (v0.3.0; v0.6.0 adds the Text | Image segments):
@@ -331,7 +332,15 @@ fun EncryptScreen(
         // (the NavHost viewport cut is gone; see TurnyptApp) — the last
         // resting item clears the ~64dp pane, scrolled content slides
         // beneath it.
-        Spacer(modifier = Modifier.height(96.dp))
+
+        // v1.5.6: the screen's own clearance under the floating glass bar
+        // (the NavHost viewport cut is gone; see TurnyptApp) — the last
+        // resting item clears the ~64dp pane, scrolled content slides
+        // beneath it. v1.6.0-beta.13: bottomClearance() insets by the
+        // navigation bar FIRST — the bar's real footprint is the nav inset
+        // plus its 12dp lift plus its height, so a flat 96dp left the last
+        // row hidden behind the bar on gesture/3-button phones.
+        Spacer(modifier = Modifier.bottomClearance())
     }
 }
 

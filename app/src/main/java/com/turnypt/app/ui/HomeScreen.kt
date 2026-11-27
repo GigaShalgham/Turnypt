@@ -36,6 +36,7 @@ import com.turnypt.app.companion.EXTRA_FROM_CLIPBOARD
 import com.turnypt.app.ui.theme.GlassRadii
 import com.turnypt.app.ui.theme.LocalGlassTokens
 import com.turnypt.app.ui.theme.glassSurface
+import com.turnypt.app.ui.theme.bottomClearance
 
 /**
  * Home (v0.5, "Calm Vault"): brand header, one status card, one
@@ -219,6 +220,14 @@ fun HomeScreen(
         // glass — 96dp clears the ~64dp pane plus its 12dp vertical inset
         // with margin to spare, while scrolled content still slides
         // beneath the translucent glass (nothing opaque between them).
-        Spacer(modifier = Modifier.height(96.dp))
+
+        // v1.5.6: the screen's own clearance under the floating glass bar
+        // (the NavHost viewport cut is gone; see TurnyptApp) — the last
+        // resting item clears the ~64dp pane, scrolled content slides
+        // beneath it. v1.6.0-beta.13: bottomClearance() insets by the
+        // navigation bar FIRST — the bar's real footprint is the nav inset
+        // plus its 12dp lift plus its height, so a flat 96dp left the last
+        // row hidden behind the bar on gesture/3-button phones.
+        Spacer(modifier = Modifier.bottomClearance())
     }
 }

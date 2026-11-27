@@ -39,6 +39,7 @@ import com.turnypt.app.companion.ImageFiles
 import com.turnypt.app.security.BiometricKeyStore
 import com.turnypt.app.security.BiometricPromptHost
 import com.turnypt.app.security.rememberBiometricPromptHelper
+import com.turnypt.app.ui.theme.bottomClearance
 
 /**
  * Stego screen (stego plan §6.1 / S4), in the app's own v1.5.10 design
@@ -441,7 +442,15 @@ fun StegoScreen(viewModel: ToolsViewModel, biometrics: BiometricKeyStore) {
         // v1.5.6: the screen's own clearance under the floating glass
         // bar — 96dp clears the ~64dp pane plus its 12dp vertical inset,
         // while scrolled content still slides beneath the glass.
-        Spacer(modifier = Modifier.height(96.dp))
+
+        // v1.5.6: the screen's own clearance under the floating glass bar
+        // (the NavHost viewport cut is gone; see TurnyptApp) — the last
+        // resting item clears the ~64dp pane, scrolled content slides
+        // beneath it. v1.6.0-beta.13: bottomClearance() insets by the
+        // navigation bar FIRST — the bar's real footprint is the nav inset
+        // plus its 12dp lift plus its height, so a flat 96dp left the last
+        // row hidden behind the bar on gesture/3-button phones.
+        Spacer(modifier = Modifier.bottomClearance())
     }
 }
 

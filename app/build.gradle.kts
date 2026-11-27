@@ -31,8 +31,8 @@ android {
         applicationId = "com.turnypt"
         minSdk = 26
         targetSdk = 36
-        versionCode = 50
-        versionName = "1.6.0-beta.12"
+        versionCode = 51
+        versionName = "1.6.0-beta.13"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -113,6 +113,48 @@ android {
     lint {
         checkReleaseBuilds = false
     }
+
+    testOptions {
+        unitTests {
+            // v1.6.0-beta.13: the desktop render harness (LiquidGlassRenderTest)
+            // needs the app's REAL resources — fonts, strings, vector icons.
+            isIncludeAndroidResources = true
+        }
+    }
+}
+
+// v1.6.0-beta.13: the render harness is OPT-IN and never part of CI's
+// `gradlew test` (it boots Robolectric's native-graphics sandbox and
+// downloads a ~110 MB android-all jar on first use):
+//
+//   ./gradlew :app:testDebugUnitTest -PlgRender --tests "*LiquidGlassRenderTest*"
+//
+// Rendered PNGs land in the directory named by -PlgRenderOut (default
+// /tmp/lg-render). Without the flag the class is excluded like any other
+// test run, so the unit-test task keeps its usual cost.
+// `-PlgRender=true` opts in. A bare `-PlgRender` (no value) arrives as the
+// empty string and ALSO counts as "on" (Gradle treats a bare flag as set);
+// everything else — including no flag at all — leaves the test excluded.
+val lgRender = (findProperty("lgRender") as String?)?.let {
+    it.isEmpty() || it.toBoolean()
+} ?: false
+tasks.withType<Test>().configureEach {
+    if (lgRender) {
+        maxHeapSize = "1700m"
+        systemProperty("robolectric.dependency.repo.url", "https://maven.aliyun.com/repository/central")
+        systemProperty("turnypt.lgRenderOut", (findProperty("lgRenderOut") as String?) ?: "/tmp/lg-render")
+        systemProperty("turnypt.lgRenderOnly", (findProperty("lgRenderOnly") as String?) ?: "")
+        systemProperty("turnypt.lgRenderPrefix", (findProperty("lgRenderPrefix") as String?) ?: "render")
+        // Pre-downloaded android-all jar (SDK 34); without it Robolectric
+        // fetches ~110 MB from repo1, which rate-limits this sandbox.
+        val robolectricJars = (findProperty("lgRobolectricJars") as String?) ?: "/tmp/robolectric-jars"
+        if (File(robolectricJars).isDirectory) {
+            systemProperty("robolectric.dependency.dir", robolectricJars)
+        }
+        outputs.upToDateWhen { false }
+    } else {
+        exclude("**/LiquidGlassRenderTest*")
+    }
 }
 
 dependencies {
@@ -159,6 +201,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // v1.6.0-beta.13: the desktop render harness (see the lgRender block above).
+    testImplementation(libs.robolectric)
+    testImplementation(composeBom)
+    testImplementation(libs.compose.ui.test.junit4)
 
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(composeBom)

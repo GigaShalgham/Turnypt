@@ -264,9 +264,9 @@
     <!-- v1.5.2: این تنظیم یک کلید ساده شد — روشن یعنی هر فایل
          رمزنگاری‌شدهٔ جدید (تصویر یا غیر تصویر) فقط پسوند tnp. می‌گیرد؛
          فیلد تایپ پسوند و رشته‌های خطایش حذف شدند. -->
-    <string name="settings_liquid_glass_title">منوی شیشه‌ای مایع</string>
-    <string name="settings_liquid_glass_summary">صفحهٔ پشت منوی اصلی را مثل شیشهٔ واقعی مات و شکسته نمایش می‌دهد. اگر منو کند شد خاموشش کنید.</string>
-    <string name="settings_liquid_glass_unsupported">شیشهٔ زنده به اندروید ۱۲ یا جدیدتر نیاز دارد و روی دستگاه‌های کم‌حافظه خاموش است. منو همان ظاهر مات را نگه می‌دارد.</string>
+    <string name="settings_liquid_glass_title">طراحی شیشه‌ای مایع</string>
+    <string name="settings_liquid_glass_summary">پشت منو، کارت‌ها و پنجره‌ها را مثل شیشهٔ واقعی مات و شکسته نمایش می‌دهد. اگر برنامه کند شد خاموشش کنید.</string>
+    <string name="settings_liquid_glass_unsupported">شیشهٔ زنده به اندروید ۱۲ یا جدیدتر نیاز دارد و روی دستگاه‌های کم‌حافظه خاموش است. سطح‌ها همان ظاهر مات را نگه می‌دارند.</string>
     <string name="settings_custom_ext_title">پسوند سفارشی فایل</string>
     <string name="settings_custom_ext_summary">خاموش (پیش‌فرض): پسوندهای خودِ Turnypt — ‎.tnpi برای تصاویر رمزنگاری‌شده، ‎.cki برای بقیه. روشن: هر فایل رمزنگاری‌شدهٔ جدید — تصویر یا غیر تصویر — فقط پسوند یکتای tnp. می‌گیرد. فقط نام عوض می‌شود: رمزگشایی هرگز به نام وابسته نیست و فایل‌هایی با هر پسوندی همچنان باز می‌شوند.</string>
     <string name="settings_clipboard_history_title">تاریخچهٔ کلیپ‌بورد</string>

@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-beta.13] - 2026-11-27 — one material for the whole design (prerelease)
+
+The user report: "stilll the main menu has many bugs you should debug it
+and it should be a bug important debug then you should make it for the
+hole design". Two jobs, in that order.
+
+**The debug.** beta.12 replaced a blur the hardware canvas ignores with
+hard-edged shapes — which reached the device as "a pill inside the pill".
+This release was checked against a NEW render harness: a unit test that
+draws the real composables through Android's real hwui/Skia pipeline
+(Robolectric native graphics, the same REFRACTIVE tier an Android 15+
+phone runs) and writes PNGs, measured by pixel scripts (row profiles,
+lens-centre detection, contrast ratios) instead of by eye. The measured
+beta.12 bugs, and their fixes:
+
+- **Tonal bands inside the bar.** The beta.12 pane drew a tint ramp as a
+  hard inset rect plus a ring; the render showed three tonal regions and
+  a full-width bright band inside one pill. The rewritten pane paints one
+  flat tint wash plus gradients that span the whole clip — a rect and a
+  full-span gradient have no edge to show. Measured: the only row jumps
+  left in the pane are its own top edge and its 1dp rim.
+- **Hard 7dp specular stripe on the lens** and **hard-edged shadow
+  pill**: the specular is now a shader uniform on the refraction lens,
+  the shadow a real Compose `shadow()`.
+- **The lens sat off its slot by up to 5dp in RTL** (measured): it now
+  travels by a translation that mirrors correctly, and its pane samples
+  the page through an anchor placed outside the transform layers.
+  Measured centre error after the fix: 0.17dp in all four renders
+  (LTR/RTL × light/dark).
+- **The last list row hid behind the bar** on phones with a gesture pill
+  or a 3-button strip: screens reserved a flat 96dp, but the bar's real
+  footprint is the navigation inset plus its lift plus its height. New
+  `Modifier.bottomClearance()` insets by the navigation bar first; all
+  six spacer sites and the Contacts FAB use it.
+- **The keyboard covered the bar and the lower fields** on Android 15+
+  (`adjustResize` no longer resizes at targetSdk 36): the content now
+  pads by the IME inset and the bar rides above the keyboard.
+- **Labels overflowed** at large font scale or on narrow screens: they
+  now auto-size stepwise down to 7sp and follow the user's font scale
+  only up to 1.3x. **Unselected labels** keep full colour instead of
+  0.72 alpha — measured contrast now 8.1:1 (light) / 9.7:1 (dark).
+
+**The whole design.** The material is no longer the menu's private
+effect. One `LiquidGlassScene` per window (field, recorded page, tier)
+is provided through a composition local; every glass surface is a pane
+of the same engine:
+
+- Cards, chips, fields, plates and sheets (`glassSurface`) are live
+  CARD panes over the window's light field — frosted, faintly bent,
+  with the same rim language as the bar. Static tier: the v1.5 flat
+  look, byte-for-byte.
+- The Contacts FAB is a small round FAB pane sampling the contact list.
+- Dialogs are glass where Android genuinely allows it: cross-window
+  blur behind the dialog window (Android 12+, `FLAG_BLUR_BEHIND`) with
+  a translucent container; near-opaque everywhere else.
+- The setting is renamed "Liquid Glass design" (EN + FA) and now
+  governs the whole material.
+
+Tier behaviour is unchanged: full material on Android 13+, frost only
+on 11–12, the flat pane below that, on low-RAM hardware, or when the
+user switches it off.
+
+
 ## [1.6.0-beta.12] - 2026-11-26 — the device-bug fix pass (prerelease)
 
 The user report: "now it is very close to liquid glass but it has many

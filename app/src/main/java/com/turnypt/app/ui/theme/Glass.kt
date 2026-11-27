@@ -1,9 +1,16 @@
 package com.turnypt.app.ui.theme
 
 import android.view.Window
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -161,8 +168,15 @@ object GlassRadii {
  * blur: real backdrop blur is only available at the WINDOW level (see
  * [applyWindowBackgroundBlur]), and in-app surfaces get honest
  * translucency — the performance-conscious reading of the brief.
+ *
+ * v1.6.0-beta.13: renamed [flatGlassSurface] — this is the STATIC tier of
+ * the material (below Android 12, low-RAM, or switched off in Settings)
+ * and the fallback every live pane paints before it is measured. Screens
+ * call the new [glassSurface], which renders a live pane of the window's
+ * [LiquidGlassScene] where the device allows it and falls back to this
+ * chain where it does not.
  */
-fun Modifier.glassSurface(
+fun Modifier.flatGlassSurface(
     glass: GlassColors,
     shape: Shape,
     tint: Color = glass.tint,
@@ -253,6 +267,110 @@ private fun highlightBrushColor(glass: GlassColors, tint: Color): Color =
  */
 fun Modifier.glassBackdrop(glass: GlassColors): Modifier =
     background(glass.backdropTop)
+
+/**
+ * v1.6.0-beta.13 (user brief: "make it for the whole design"): the glass
+ * every surface in the window is made of.
+ *
+ * On the live tiers this is a PANE of the window's [LiquidGlassScene] —
+ * the same material the main menu is made of: a copy of what lies behind
+ * the surface, frosted and bent, with the scene's rim over it. A surface
+ * never samples a layer that contains itself, so a card reads the static
+ * FIELD, not the page — cards sit directly on the field and a card that
+ * sampled the page would blur its own output back into itself wherever
+ * the two stacks overlap.
+ *
+ * On the static tier (below Android 12, low-RAM, switched off) and for
+ * surfaces that carry their own fill (avatars) this is the v1.5
+ * [flatGlassSurface] chain — the look the app has had since v1.5, kept
+ * byte-for-byte.
+ */
+@Composable
+fun Modifier.glassSurface(
+    glass: GlassColors,
+    shape: Shape,
+    tint: Color = glass.tint,
+    live: Boolean = true,
+): Modifier {
+    val scene = currentLiquidGlassScene()
+    return if (live && scene != null) {
+        val colors = liquidGlassColors()
+        val rimBrush = remember(colors) {
+            Brush.verticalGradient(0f to colors.rimTop, 1f to colors.rimBottom)
+        }
+        this
+            .shadow(
+                elevation = 6.dp,
+                shape = shape,
+                clip = false,
+                ambientColor = glass.shadowColor,
+                spotColor = glass.shadowColor,
+            )
+            .liquidGlassPane(
+                scene = scene,
+                shape = shape,
+                kind = LiquidGlassKind.CARD,
+                tint = tint,
+            )
+            .liquidRim(shape, rimBrush)
+    } else {
+        flatGlassSurface(glass, shape, tint)
+    }
+}
+
+/**
+ * v1.6.0-beta.13 (bug D of the menu report): the trailing clearance every
+ * scrollable screen leaves under its last item so nothing rests hidden
+ * behind the floating bar.
+ *
+ * The old flat `Spacer(96.dp)` answered the v1.5 bar, which floated 12dp
+ * above the screen foot — but edge-to-edge does not inset the layout, so
+ * on a phone with a gesture pill or a 3-button strip the bar's real
+ * footprint is the navigation inset PLUS 12dp PLUS its own ~65dp height
+ * PLUS 12dp of air. The flat 96dp left the last list row under the bar
+ * exactly there. The clearance now insets by the navigation bar first —
+ * the height an item actually clears — and the visual rest is the same
+ * 96dp the screens have always reserved.
+ */
+@Composable
+fun Modifier.bottomClearance(): Modifier =
+    windowInsetsPadding(WindowInsets.navigationBars).height(96.dp)
+
+/**
+ * v1.6.0-beta.13: REAL blur behind a dialog window, where Android
+ * genuinely provides it. `FLAG_BLUR_BEHIND` + `setBlurBehindRadius`
+ * (API 31+) let the platform compositor blur the app beneath the dialog
+ * — the same mechanism the translucent companion sheets use (see
+ * [applyWindowBackgroundBlur]); cross-window blur must also be enabled
+ * by the system, which the window's `WindowManager` reports honestly.
+ * Below 31, or where the system disallows it, the dialog keeps its
+ * dimmed scrim, which already reads as glass. Gated and failure-safe on
+ * purpose: no library, no recreated blur pipeline.
+ *
+ * @return the radius actually applied, or 0 when none was (so the caller
+ *   can pick a more or less translucent container to compensate).
+ */
+fun applyDialogBlur(window: Window, radiusPx: Int): Int {
+    if (android.os.Build.VERSION.SDK_INT < 31) return 0
+    return runCatching {
+        val context = window.context
+        val enabled = context.getSystemService(WindowManager::class.java)
+            ?.isCrossWindowBlurEnabled == true
+        if (!enabled) return@runCatching 0
+        window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        window.attributes = window.attributes.apply { blurBehindRadius = radiusPx }
+        radiusPx
+    }.getOrDefault(0)
+}
+
+/** The counterpart of [applyDialogBlur] — restores the plain dimmed dialog. */
+fun clearDialogBlur(window: Window) {
+    if (android.os.Build.VERSION.SDK_INT < 31) return
+    runCatching {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        window.attributes = window.attributes.apply { blurBehindRadius = 0 }
+    }
+}
 
 /**
  * REAL Liquid-Glass backdrop blur, where Android genuinely provides it:
